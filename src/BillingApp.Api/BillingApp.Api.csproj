@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.26" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BillingApp.Application\BillingApp.Application.csproj" />
+    <ProjectReference Include="..\BillingApp.Infrastructure\BillingApp.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Ship migrations next to build output so published/hosted APIs always apply 007 (tenancy columns). -->
+  <ItemGroup>
+    <None Include="..\..\db\migrations\*.sql" CopyToOutputDirectory="PreserveNewest" Link="db\migrations\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

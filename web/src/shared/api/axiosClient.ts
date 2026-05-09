@@ -1,0 +1,170 @@
+import axios, {
+  AxiosError,
+  AxiosHeaders,
+  type AxiosRequestConfig,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from 'axios';
+import type { SessionPayload } from '../auth/normalizeSessionPayload';
+import { store } from '../../app/store';
+import { clearSession, readPersistedAuth, setSession } from '../../features/auth/authSlice';
+import { normalizeSessionPayload } from '../auth/normalizeSessionPayload';
+import { getBaseApiUrl } from '../config';
+
+const baseURL = getBaseApiUrl();
+
+/** Unauthenticated calls (login, refresh) — no bearer / no refresh retry. */
+export const plainApi = axios.create({
+  baseURL,
+});
+
+/** Bearer requests + automatic refresh on 401 (except login/refresh paths). */
+export const authApi = axios.create({
+  baseURL,
+});
+
+type RetryCfg = InternalAxiosRequestConfig & { _retry?: boolean };
+
+/** Single-flight refresh — parallel 401s must not each call /v1/auth/refresh (rotating refresh tokens would revoke siblings). */
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshSessionSingleFlight(): Promise<string | null> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async (): Promise<string | null> => {
+      let refreshToken = store.getState().auth.refreshToken;
+      if (!refreshToken) {
+        refreshToken = readPersistedAuth().refreshToken;
+      }
+      if (!refreshToken) {
+        store.dispatch(clearSession());
+        return null;
+      }
+      try {
+        const oid =
+          store.getState().auth.organizationId ?? readPersistedAuth().organizationId ?? undefined;
+        const body: { refreshToken: string; organizationId?: number } = { refreshToken };
+        if (oid != null) body.organizationId = oid;
+
+        const { data } = await plainApi.post<unknown>('/v1/auth/refresh', body);
+        const normalized = normalizeSessionPayload(data);
+        if (!normalized) {
+          store.dispatch(clearSession());
+          return null;
+        }
+        store.dispatch(setSession(normalized));
+        return normalized.accessToken;
+      } catch {
+        store.dispatch(clearSession());
+        return null;
+      }
+    })().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+function setBearer(config: InternalAxiosRequestConfig, accessToken: string) {
+  if (!config.headers) {
+    config.headers = new AxiosHeaders();
+  }
+  const h = config.headers;
+  if (typeof h.set === 'function') {
+    h.set('Authorization', `Bearer ${accessToken}`, false);
+  } else {
+    (config.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
+  }
+}
+
+authApi.interceptors.request.use((config) => {
+  let token = store.getState().auth.accessToken;
+  if (!token) {
+    const persisted = readPersistedAuth();
+    if (
+      persisted.accessToken &&
+      persisted.refreshToken &&
+      persisted.tenantId != null &&
+      persisted.organizationId != null
+    ) {
+      store.dispatch(
+        setSession({
+          accessToken: persisted.accessToken,
+          refreshToken: persisted.refreshToken,
+          tenantId: persisted.tenantId,
+          organizationId: persisted.organizationId,
+        }),
+      );
+      token = persisted.accessToken;
+    }
+  }
+  if (token) {
+    setBearer(config, token);
+  }
+  return config;
+});
+
+authApi.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as RetryCfg | undefined;
+    if (!originalRequest || originalRequest._retry) {
+      return Promise.reject(error);
+    }
+    if (error.response?.status !== 401) {
+      return Promise.reject(error);
+    }
+
+    const reqUrl = originalRequest.url ?? '';
+    if (reqUrl.includes('/v1/auth/refresh') || reqUrl.includes('/v1/auth/login')) {
+      store.dispatch(clearSession());
+      return Promise.reject(error);
+    }
+
+    originalRequest._retry = true;
+    const accessToken = await refreshSessionSingleFlight();
+    if (!accessToken) {
+      return Promise.reject(error);
+    }
+
+    setBearer(originalRequest, accessToken);
+    return authApi(originalRequest);
+  },
+);
+
+/** JSON helper — GET by default; pass `{ method: 'PATCH', data }` etc. */
+export async function apiJsonAuth<T>(path: string, config?: AxiosRequestConfig): Promise<T> {
+  try {
+    const res = await authApi.request<T>({
+      url: path,
+      method: config?.method ?? 'GET',
+      ...config,
+    });
+    return res.data;
+  } catch (e) {
+    if (axios.isAxiosError(e)) {
+      if (e.response?.status === 401) {
+        store.dispatch(clearSession());
+        throw new Error('Unauthorized — sign in again.');
+      }
+      const m = (config?.method ?? 'GET').toString().toUpperCase();
+      throw new Error(`${m} ${path}: ${e.response?.status ?? 'network'}`);
+    }
+    throw e;
+  }
+}
+
+export async function switchWorkplaceOrganization(organizationId: number): Promise<SessionPayload> {
+  const rt = store.getState().auth.refreshToken ?? readPersistedAuth().refreshToken;
+  if (!rt) throw new Error('Not signed in');
+
+  const { data } = await plainApi.post<unknown>('/v1/auth/refresh', {
+    refreshToken: rt,
+    organizationId,
+  });
+
+  const normalized = normalizeSessionPayload(data);
+  if (!normalized) throw new Error('Invalid refresh response');
+
+  store.dispatch(setSession(normalized));
+  return normalized;
+}

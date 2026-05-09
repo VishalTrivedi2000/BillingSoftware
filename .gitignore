@@ -1,0 +1,77 @@
+# --- ASP.NET Core / .NET ---
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.userosscache
+*.suo
+*.cache
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+**/publish/
+TestResults/
+[Bb]uild[Ll]og.*
+*.DotSettings.user
+*.rsuser
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# VS / Rider / VS Code (keep shared editorconfig; ignore local workspace junk)
+.vs/
+.idea/
+*.sln.iml
+
+# User secrets & local overrides (track appsettings.json when safe; never secrets)
+**/appsettings.*.local.json
+**/secrets.json
+
+# --- Node / React / Vite (web/) ---
+**/node_modules/
+dist/
+dist-ssr/
+*.local
+.npm
+.cache/
+.parcel-cache/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Env files (keep *.example tracked)
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# --- Playwright ---
+**/test-results/
+**/playwright-report/
+**/blob-report/
+**/playwright/.cache/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Python (docs tooling) ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Office temp locks ---
+~$*
+
+# --- Misc ---
+# Local developer secrets notes — do not publish (see README / User Secrets).
+docs/DEV_CREDENTIALS_TMP.md
+
+*.log
+**/uploads/
+temp/
+tmp/
