@@ -142,7 +142,7 @@ export function LoginPage() {
               {
                 icon: Lock,
                 title: 'Refresh + protected UI',
-                desc: 'Dashboard calls /v1/health with a bearer token; /profile requires auth. CORS allows localhost:5173 in dev.',
+                desc: 'Dashboard hits /v1/health anonymously for readiness; authenticated calls use Bearer for metrics, invoices, and profile. CORS allows localhost:5173 in dev.',
               },
             ].map(({ icon: Icon, title, desc }) => (
               <div key={title} className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">

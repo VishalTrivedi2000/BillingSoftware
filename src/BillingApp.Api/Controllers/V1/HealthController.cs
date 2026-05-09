@@ -1,5 +1,3 @@
-using BillingApp.Api.Authorization;
-using BillingApp.Application.Security;
 using System.Data.Common;
 using BillingApp.Application.Abstractions.Data;
 using Microsoft.AspNetCore.Authorization;
@@ -18,7 +16,8 @@ public sealed class HealthController : ControllerBase
         _connectionFactory = connectionFactory;
     }
 
-    [Authorize(Policy = PolicyNames.BuiltIn.SystemHealth)]
+    /// <summary>Unauthenticated readiness probe (SPA dashboard + ops); SQL check only — no JWT required.</summary>
+    [AllowAnonymous]
     [HttpGet]
     public async Task<ActionResult<object>> Get(CancellationToken cancellationToken)
     {

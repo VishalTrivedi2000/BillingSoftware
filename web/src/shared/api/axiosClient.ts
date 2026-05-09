@@ -23,7 +23,8 @@ export const authApi = axios.create({
   baseURL,
 });
 
-type RetryCfg = InternalAxiosRequestConfig & { _retry?: boolean };
+/** True after we've already refreshed tokens and replayed this request once — a further 401 is terminal. */
+type RetryCfg = InternalAxiosRequestConfig & { _billingReplayAfterRefresh?: boolean };
 
 /** Single-flight refresh — parallel 401s must not each call /v1/auth/refresh (rotating refresh tokens would revoke siblings). */
 let refreshInFlight: Promise<string | null> | null = null;
@@ -68,11 +69,17 @@ function setBearer(config: InternalAxiosRequestConfig, accessToken: string) {
   if (!config.headers) {
     config.headers = new AxiosHeaders();
   }
+  const bearer = `Bearer ${accessToken}`;
   const h = config.headers;
+
+  /** AxiosHeaders: third arg false = skip if exists — stale Authorization must be replaced on refresh replay. */
+  if (typeof h.delete === 'function') {
+    h.delete('Authorization');
+  }
   if (typeof h.set === 'function') {
-    h.set('Authorization', `Bearer ${accessToken}`, false);
+    (h as AxiosHeaders).set('Authorization', bearer, true);
   } else {
-    (config.headers as Record<string, string>)['Authorization'] = `Bearer ${accessToken}`;
+    (config.headers as Record<string, string>)['Authorization'] = bearer;
   }
 }
 
@@ -107,7 +114,7 @@ authApi.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as RetryCfg | undefined;
-    if (!originalRequest || originalRequest._retry) {
+    if (!originalRequest) {
       return Promise.reject(error);
     }
     if (error.response?.status !== 401) {
@@ -120,7 +127,12 @@ authApi.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    originalRequest._retry = true;
+    if (originalRequest._billingReplayAfterRefresh) {
+      store.dispatch(clearSession());
+      return Promise.reject(error);
+    }
+
+    originalRequest._billingReplayAfterRefresh = true;
     const accessToken = await refreshSessionSingleFlight();
     if (!accessToken) {
       return Promise.reject(error);
@@ -143,7 +155,7 @@ export async function apiJsonAuth<T>(path: string, config?: AxiosRequestConfig):
   } catch (e) {
     if (axios.isAxiosError(e)) {
       if (e.response?.status === 401) {
-        store.dispatch(clearSession());
+        // Session teardown is handled in the auth response interceptor after refresh/replay finishes.
         throw new Error('Unauthorized — sign in again.');
       }
       const m = (config?.method ?? 'GET').toString().toUpperCase();

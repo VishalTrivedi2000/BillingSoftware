@@ -321,8 +321,7 @@ export function DashboardPage() {
             </ul>
             {healthQ.isError && (
               <div role="alert" className="mt-4 rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-xs text-rose-200">
-                Health check failed — confirm <span className="font-mono">VITE_BASE_API_URL</span>, API is running, and CORS allows this origin. If you were signed in, your session may have expired (
-                <span className="font-mono">401</span> clears the token). Admins satisfy <span className="font-mono">system.health</span> via role bypass.
+                Health check failed — confirm <span className="font-mono">VITE_BASE_API_URL</span>, API is running, and CORS allows this origin. Endpoint is anonymous; persistent failures usually mean the API URL is wrong or unreachable.
                 <button
                   type="button"
                   onClick={() => {
