@@ -40,9 +40,10 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Server=(localdb)\\mssqllocaldb;Database=BillingApp;Trusted_Connection=True;TrustServerCertificate=true;";
+    ?? "Data Source=AKASH\\SQLEXPRESS01;Initial Catalog=BSDB;Integrated Security=True;Trust Server Certificate=True";
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddBillingCore();
+builder.Services.AddBillingProfiles(builder.Configuration);
 
 builder.Services.Configure<FormOptions>(options =>
 {
