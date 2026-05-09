@@ -1,5 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import { createSlice } from '@reduxjs/toolkit';
+import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { SessionPayload } from '../../shared/auth/normalizeSessionPayload';
 
 const ACCESS = 'billing.accessToken';
@@ -93,12 +93,18 @@ export const authReducer = authSlice.reducer;
 /** Auth subtree selector input — compatible with `RootState`. */
 type AuthRoot = { auth: AuthState };
 
+function sessionComplete(a: AuthState): boolean {
+  return Boolean(
+    a.accessToken && a.refreshToken && a.tenantId != null && a.organizationId != null,
+  );
+}
+
 /**
- * True when Redux has an access token OR persisted keys exist (covers hydration timing / Strict Mode oddities).
- * Axios request interceptor syncs Redux from localStorage before attaching Authorization.
+ * Signed-in only when access + refresh + tenant/org are present (JWT workplace claims).
+ * Treating “access token only” as authenticated causes protected queries to run without a refresh token → refresh fails → 401 loops.
  */
 export function selectIsAuthenticated(state: AuthRoot): boolean {
-  if (Boolean(state.auth.accessToken)) return true;
+  if (sessionComplete(state.auth)) return true;
   const p = readPersistedAuth();
   return Boolean(p.accessToken && p.refreshToken && p.tenantId != null && p.organizationId != null);
 }
@@ -108,10 +114,17 @@ export function selectAccessToken(state: AuthRoot): string | null {
   return readPersistedAuth().accessToken;
 }
 
-export function selectWorkplaceSnapshot(state: AuthRoot): WorkplaceSnapshot | null {
-  const { tenantId, organizationId } = state.auth;
+const selectAuthBranch = (state: AuthRoot) => state.auth;
+
+/** Memoized reference when tenant/org unchanged — avoids Redux useSelector stability warnings. */
+export const selectWorkplaceSnapshot = createSelector([selectAuthBranch], (auth): WorkplaceSnapshot | null => {
+  let tenantId = auth.tenantId;
+  let organizationId = auth.organizationId;
+  if (tenantId == null || organizationId == null) {
+    const p = readPersistedAuth();
+    tenantId = p.tenantId;
+    organizationId = p.organizationId;
+  }
   if (tenantId != null && organizationId != null) return { tenantId, organizationId };
-  const p = readPersistedAuth();
-  if (p.tenantId != null && p.organizationId != null) return { tenantId: p.tenantId, organizationId: p.organizationId };
   return null;
-}
+});

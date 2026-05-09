@@ -79,7 +79,7 @@ builder.Services.AddSingleton(new AuthBootstrapOptions
 });
 
 builder.Services.AddBillingAuth(builder.Configuration);
-builder.Services.AddBillingJwtAndAuthorizationPolicies(builder.Configuration);
+builder.Services.AddBillingJwtAndAuthorizationPolicies(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
@@ -89,8 +89,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
 app.UseCors("web");
+app.UseHttpsRedirection();
 
 var profileOpts = app.Configuration.GetSection(ProfileStorageOptions.SectionName).Get<ProfileStorageOptions>()
                   ?? new ProfileStorageOptions();

@@ -54,8 +54,14 @@ async function refreshSessionSingleFlight(): Promise<string | null> {
         }
         store.dispatch(setSession(normalized));
         return normalized.accessToken;
-      } catch {
-        store.dispatch(clearSession());
+      } catch (e) {
+        // Network / TLS errors: keep stored session so the user can retry; only tear down on explicit auth failures.
+        if (axios.isAxiosError(e)) {
+          const status = e.response?.status;
+          if (status === 401 || status === 403) {
+            store.dispatch(clearSession());
+          }
+        }
         return null;
       }
     })().finally(() => {
@@ -139,17 +145,22 @@ authApi.interceptors.response.use(
     }
 
     setBearer(originalRequest, accessToken);
-    return authApi(originalRequest);
+    // error.config often drops baseURL; replay must resolve against the same API root as login.
+    if (!originalRequest.baseURL) {
+      originalRequest.baseURL = baseURL;
+    }
+    return authApi.request(originalRequest);
   },
 );
 
 /** JSON helper — GET by default; pass `{ method: 'PATCH', data }` etc. */
 export async function apiJsonAuth<T>(path: string, config?: AxiosRequestConfig): Promise<T> {
+  const method = config?.method ?? 'GET';
   try {
     const res = await authApi.request<T>({
+      ...(config ?? {}),
       url: path,
-      method: config?.method ?? 'GET',
-      ...config,
+      method,
     });
     return res.data;
   } catch (e) {
@@ -158,7 +169,7 @@ export async function apiJsonAuth<T>(path: string, config?: AxiosRequestConfig):
         // Session teardown is handled in the auth response interceptor after refresh/replay finishes.
         throw new Error('Unauthorized — sign in again.');
       }
-      const m = (config?.method ?? 'GET').toString().toUpperCase();
+      const m = method.toString().toUpperCase();
       throw new Error(`${m} ${path}: ${e.response?.status ?? 'network'}`);
     }
     throw e;

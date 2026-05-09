@@ -5,13 +5,17 @@ using BillingApp.Application.Security;
 using BillingApp.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 
 namespace BillingApp.Api;
 
 public static class JwtAndAuthorizationInstaller
 {
-    public static IServiceCollection AddBillingJwtAndAuthorizationPolicies(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddBillingJwtAndAuthorizationPolicies(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         var jwtSection = configuration.GetSection(JwtOptions.SectionName);
         var jwt = jwtSection.Get<JwtOptions>()
@@ -23,6 +27,10 @@ public static class JwtAndAuthorizationInstaller
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
+                // Symmetric JWT — no metadata fetch; relax HTTPS requirement for mixed http/https dev URLs.
+                if (environment.IsDevelopment())
+                    options.RequireHttpsMetadata = false;
+
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -71,10 +79,34 @@ public static class JwtAndAuthorizationInstaller
         {
             o.AddPolicy("web", b =>
             {
-                b.WithOrigins(
-                        "http://localhost:5173",
-                        "https://localhost:5173")
-                    .AllowAnyHeader()
+                // Development: any localhost / loopback origin + port so Vite (or proxies) always passes preflight with Bearer.
+                if (environment.IsDevelopment())
+                {
+                    b.SetIsOriginAllowed(static origin =>
+                    {
+                        try
+                        {
+                            var uri = new Uri(origin);
+                            return uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+                                   || uri.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase);
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    });
+                }
+                else
+                {
+                    b.WithOrigins(
+                            "http://localhost:5173",
+                            "https://localhost:5173",
+                            "http://127.0.0.1:5173",
+                            "https://127.0.0.1:5173")
+                        ;
+                }
+
+                b.AllowAnyHeader()
                     .AllowAnyMethod();
             });
         });
