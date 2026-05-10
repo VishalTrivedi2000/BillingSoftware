@@ -1,1 +1,1 @@
-export { apiUrl, getBaseApiUrl } from './api';
+export { apiUrl, getBaseApiUrl, productImageUrl } from './api';

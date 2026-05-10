@@ -498,16 +498,17 @@ public sealed class AuthRepository : IAuthRepository
     public async Task<bool> UserBelongsToWorkplaceAsync(long userId, long tenantId, long organizationId, CancellationToken ct)
     {
         const string sql = """
-            SELECT COUNT(1)
-            FROM dbo.UserOrganizations uo
-            INNER JOIN dbo.Organizations o ON o.OrganizationId = uo.OrganizationId AND o.IsActive = 1
-            INNER JOIN dbo.Tenants t ON t.TenantId = o.TenantId AND t.IsActive = 1
-            WHERE uo.UserId = @UserId AND uo.OrganizationId = @OrganizationId AND o.TenantId = @TenantId;
+            SELECT CAST(CASE WHEN EXISTS (
+                SELECT 1
+                FROM dbo.UserOrganizations uo
+                INNER JOIN dbo.Organizations o ON o.OrganizationId = uo.OrganizationId AND o.IsActive = 1
+                INNER JOIN dbo.Tenants t ON t.TenantId = o.TenantId AND t.IsActive = 1
+                WHERE uo.UserId = @UserId AND uo.OrganizationId = @OrganizationId AND o.TenantId = @TenantId
+            ) THEN 1 ELSE 0 END AS BIT);
             """;
         await using var c = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
-        var n = await c.ExecuteScalarAsync<int>(
+        return await c.QuerySingleAsync<bool>(
             new CommandDefinition(sql, new { UserId = userId, TenantId = tenantId, OrganizationId = organizationId }, cancellationToken: ct))
             .ConfigureAwait(false);
-        return n > 0;
     }
 }

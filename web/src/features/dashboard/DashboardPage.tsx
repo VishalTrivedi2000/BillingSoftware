@@ -122,25 +122,27 @@ export function DashboardPage() {
   const workplace = useAppSelector(selectWorkplaceSnapshot);
   const workplaceOrgId = workplace?.organizationId ?? 0;
 
+  const queryReady = authed && workplace != null;
+
   const healthQ = useQuery({
     queryKey: ['health', workplaceOrgId],
     queryFn: fetchHealth,
     retry: 1,
-    enabled: authed && workplace != null,
+    enabled: queryReady,
   });
 
   const metricsQ = useQuery({
     queryKey: ['dashboard-metrics', workplaceOrgId],
     queryFn: fetchMetrics,
     retry: 1,
-    enabled: authed && workplace != null,
+    enabled: queryReady,
   });
 
   const invoicesQ = useQuery({
     queryKey: ['invoices-recent', workplaceOrgId],
     queryFn: fetchRecentInvoices,
     retry: 1,
-    enabled: authed && workplace != null,
+    enabled: queryReady,
   });
 
   const trendRows = invoicesQ.data ?? [];

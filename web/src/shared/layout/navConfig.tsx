@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { FileText, LayoutDashboard, Package, UserCircle, Users } from 'lucide-react';
+import { Building2, FileText, LayoutDashboard, Package, Truck, UserCircle, Users } from 'lucide-react';
 
 export type NavItem = {
   to: string;
@@ -26,10 +26,24 @@ export const APP_NAV: NavItem[] = [
     section: 'Billing',
   },
   {
+    to: '/purchases',
+    label: 'Purchases',
+    description: 'Supplier inward bills — purchases.read / purchases.create',
+    icon: Truck,
+    section: 'Billing',
+  },
+  {
     to: '/customers',
     label: 'Customers',
     description: 'Buyer accounts scoped to this organization',
     icon: Users,
+    section: 'Masters',
+  },
+  {
+    to: '/parties',
+    label: 'Parties',
+    description: 'Onboard counterparties under this organization',
+    icon: Building2,
     section: 'Masters',
   },
   {

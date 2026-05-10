@@ -1,5 +1,5 @@
-import { FormEvent, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react';
 import axios from 'axios';
@@ -29,8 +29,10 @@ function newLine(): DraftLine {
 
 export function InvoiceCreatePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const qc = useQueryClient();
   const workplaceOrgId = useAppSelector(selectWorkplaceSnapshot)?.organizationId ?? 0;
+  const appliedUrlCustomerRef = useRef(false);
 
   const [customerId, setCustomerId] = useState<number | ''>('');
   const [lines, setLines] = useState<DraftLine[]>(() => [newLine()]);
@@ -44,6 +46,16 @@ export function InvoiceCreatePage() {
     },
     retry: 1,
   });
+
+  useEffect(() => {
+    if (appliedUrlCustomerRef.current) return;
+    const raw = searchParams.get('customerId');
+    if (raw == null || raw === '') return;
+    const id = Number(raw);
+    if (!Number.isFinite(id) || id <= 0 || !Number.isInteger(id)) return;
+    appliedUrlCustomerRef.current = true;
+    setCustomerId(id);
+  }, [searchParams]);
 
   const productsQ = useQuery({
     queryKey: ['products-pick', workplaceOrgId],

@@ -17,6 +17,12 @@ public static class PermissionNames
     public const string InvoicesRead = "invoices.read";
     public const string InvoicesUpdate = "invoices.update";
 
+    /// <summary>Record money collected against a posted invoice (settlement ledger).</summary>
+    public const string InvoicePaymentsRecord = "invoicePayments.record";
+
+    public const string PurchasesRead = "purchases.read";
+    public const string PurchasesCreate = "purchases.create";
+
     public const string CustomersRead = "customers.read";
     public const string CustomersCreate = "customers.create";
     public const string CustomersUpdate = "customers.update";
@@ -31,6 +37,9 @@ public static class PermissionNames
     public const string OrganizationsRead = "organizations.read";
     public const string OrganizationsManage = "organizations.manage";
 
+    public const string PartiesRead = "parties.read";
+    public const string PartiesManage = "parties.manage";
+
     public static IReadOnlyList<string> All { get; } =
     [
         SystemHealth,
@@ -42,6 +51,9 @@ public static class PermissionNames
         InvoicesCreate,
         InvoicesRead,
         InvoicesUpdate,
+        InvoicePaymentsRecord,
+        PurchasesRead,
+        PurchasesCreate,
         CustomersRead,
         CustomersCreate,
         CustomersUpdate,
@@ -52,5 +64,7 @@ public static class PermissionNames
         TenantsManage,
         OrganizationsRead,
         OrganizationsManage,
+        PartiesRead,
+        PartiesManage,
     ];
 }

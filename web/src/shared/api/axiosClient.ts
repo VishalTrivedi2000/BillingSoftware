@@ -18,7 +18,12 @@ export const plainApi = axios.create({
   baseURL,
 });
 
-/** Bearer requests + automatic refresh on 401 (except login/refresh paths). */
+/**
+ * Authenticated HTTP client: the **request interceptor** below attaches
+ * `Authorization: Bearer <accessToken>` from Redux / persisted session when the
+ * session is “ready” (access + refresh + tenant + org). Call sites do not pass
+ * the token in per-request `config`.
+ */
 export const authApi = axios.create({
   baseURL,
 });
@@ -54,8 +59,13 @@ async function refreshSessionSingleFlight(): Promise<string | null> {
         }
         store.dispatch(setSession(normalized));
         return normalized.accessToken;
-      } catch {
-        store.dispatch(clearSession());
+      } catch (e) {
+        if (axios.isAxiosError(e)) {
+          const status = e.response?.status;
+          if (status === 401 || status === 403) {
+            store.dispatch(clearSession());
+          }
+        }
         return null;
       }
     })().finally(() => {
@@ -83,27 +93,36 @@ function setBearer(config: InternalAxiosRequestConfig, accessToken: string) {
   }
 }
 
+function sessionReady(a: {
+  accessToken: string | null;
+  refreshToken: string | null;
+  tenantId: number | null;
+  organizationId: number | null;
+}): boolean {
+  return Boolean(
+    a.accessToken && a.refreshToken && a.tenantId != null && a.organizationId != null,
+  );
+}
+
 authApi.interceptors.request.use((config) => {
-  let token = store.getState().auth.accessToken;
-  if (!token) {
-    const persisted = readPersistedAuth();
-    if (
-      persisted.accessToken &&
-      persisted.refreshToken &&
-      persisted.tenantId != null &&
-      persisted.organizationId != null
-    ) {
+  const s = store.getState().auth;
+  let token = sessionReady(s) ? s.accessToken : null;
+
+  if (!sessionReady(s)) {
+    const p = readPersistedAuth();
+    if (sessionReady(p)) {
       store.dispatch(
         setSession({
-          accessToken: persisted.accessToken,
-          refreshToken: persisted.refreshToken,
-          tenantId: persisted.tenantId,
-          organizationId: persisted.organizationId,
+          accessToken: p.accessToken!,
+          refreshToken: p.refreshToken!,
+          tenantId: p.tenantId!,
+          organizationId: p.organizationId!,
         }),
       );
-      token = persisted.accessToken;
+      token = p.accessToken;
     }
   }
+
   if (token) {
     setBearer(config, token);
   }
@@ -139,26 +158,43 @@ authApi.interceptors.response.use(
     }
 
     setBearer(originalRequest, accessToken);
-    return authApi(originalRequest);
+    if (!originalRequest.baseURL) {
+      originalRequest.baseURL = baseURL;
+    }
+    return authApi.request(originalRequest);
   },
 );
 
-/** JSON helper — GET by default; pass `{ method: 'PATCH', data }` etc. */
+/**
+ * JSON helper on {@link authApi}. Bearer auth is **not** supplied via `config`:
+ * the interceptor adds `Authorization` from the store (see `sessionReady`).
+ * For GET `/v1/auth/me`, omit `config` entirely — `undefined` is correct.
+ * A 401 means no token was attached or the API rejected the JWT, not a missing `config`.
+ */
 export async function apiJsonAuth<T>(path: string, config?: AxiosRequestConfig): Promise<T> {
+  const extras = config != null ? { ...config } : {};
+  const method = extras.method ?? 'GET';
+  const requestConfig: AxiosRequestConfig = {
+    ...extras,
+    url: path,
+    method,
+  };
   try {
-    const res = await authApi.request<T>({
-      url: path,
-      method: config?.method ?? 'GET',
-      ...config,
-    });
+    const res = await authApi.request<T>(requestConfig);
     return res.data;
   } catch (e) {
     if (axios.isAxiosError(e)) {
-      if (e.response?.status === 401) {
+      const status = e.response?.status;
+      if (status === 403) {
+        throw new Error(
+          'Access denied for this workspace (403). Your JWT tenant/org may not match database membership — check UserOrganizations / seed data.',
+        );
+      }
+      if (status === 401) {
         // Session teardown is handled in the auth response interceptor after refresh/replay finishes.
         throw new Error('Unauthorized — sign in again.');
       }
-      const m = (config?.method ?? 'GET').toString().toUpperCase();
+      const m = String(requestConfig.method ?? 'GET').toUpperCase();
       throw new Error(`${m} ${path}: ${e.response?.status ?? 'network'}`);
     }
     throw e;

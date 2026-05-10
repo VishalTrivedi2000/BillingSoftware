@@ -16,7 +16,10 @@ function crumbTrail(pathname: string): string[] {
   if (pathname === '/dashboard') return ['Billing workspace', 'Dashboard'];
   if (pathname === '/invoices' || pathname === '/invoices/new') return ['Billing workspace', 'Invoices'];
   if (pathname.startsWith('/invoices/')) return ['Billing workspace', 'Invoices', 'Detail'];
+  if (pathname === '/purchases' || pathname === '/purchases/new') return ['Billing workspace', 'Purchases'];
+  if (pathname.startsWith('/purchases/')) return ['Billing workspace', 'Purchases', 'Detail'];
   if (pathname === '/customers') return ['Billing workspace', 'Customers'];
+  if (pathname === '/parties') return ['Billing workspace', 'Parties'];
   if (pathname === '/products') return ['Billing workspace', 'Products'];
   if (pathname === '/profile') return ['Billing workspace', 'Profile'];
   return ['Billing workspace'];
@@ -109,13 +112,15 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-[#070a12] text-slate-100">
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <div className="no-print">
+        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      </div>
 
       {/* Mobile overlay */}
       {mobileNavOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          className="no-print fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
           aria-label="Close menu"
           onClick={() => setMobileNavOpen(false)}
         />
@@ -123,13 +128,13 @@ export function AppLayout() {
 
       <div className="flex min-h-screen">
         {/* Sidebar desktop */}
-        <aside className="relative z-50 hidden w-[272px] shrink-0 flex-col border-r border-white/10 bg-[#0a0f1a] lg:flex">
+        <aside className="no-print relative z-50 hidden w-[272px] shrink-0 flex-col border-r border-white/10 bg-[#0a0f1a] lg:flex">
           {sidebarInner}
         </aside>
 
         {/* Sidebar mobile */}
         <aside
-          className={`fixed inset-y-0 left-0 z-50 flex w-[min(288px,92vw)] flex-col border-r border-white/10 bg-[#0a0f1a] shadow-2xl transition-transform duration-200 lg:hidden ${
+          className={`no-print fixed inset-y-0 left-0 z-50 flex w-[min(288px,92vw)] flex-col border-r border-white/10 bg-[#0a0f1a] shadow-2xl transition-transform duration-200 lg:hidden ${
             mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -147,7 +152,7 @@ export function AppLayout() {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070a12]/90 backdrop-blur-md">
+          <header className="no-print sticky top-0 z-30 border-b border-white/10 bg-[#070a12]/90 backdrop-blur-md">
             <div className="flex flex-wrap items-center gap-3 px-4 py-3 lg:px-6">
               <button
                 type="button"

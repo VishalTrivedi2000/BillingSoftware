@@ -150,6 +150,28 @@ public sealed class InvoiceRepository : IInvoiceRepository
         var lines = await conn.QueryAsync<InvoiceLineDto>(
             new CommandDefinition(linesSql, new { InvoiceId = invoiceId }, cancellationToken: ct)).ConfigureAwait(false);
 
+        const string paidSql = """
+                               SELECT ISNULL(SUM(Amount), 0)
+                               FROM dbo.InvoicePayments
+                               WHERE InvoiceId = @InvoiceId AND TenantId = @TenantId AND OrganizationId = @OrganizationId;
+                               """;
+        var amountPaid = await conn.ExecuteScalarAsync<decimal>(
+            new CommandDefinition(paidSql,
+                new { InvoiceId = invoiceId, TenantId = _wp.TenantId, OrganizationId = _wp.OrganizationId }, cancellationToken: ct)).ConfigureAwait(false);
+        amountPaid = decimal.Round(amountPaid, 2, MidpointRounding.AwayFromZero);
+
+        const string paymentsSql = """
+                                   SELECT InvoicePaymentId, Amount, ReceivedUtc, Channel, ReferenceNote
+                                   FROM dbo.InvoicePayments
+                                   WHERE InvoiceId = @InvoiceId AND TenantId = @TenantId AND OrganizationId = @OrganizationId
+                                   ORDER BY ReceivedUtc DESC, InvoicePaymentId DESC;
+                                   """;
+        var payments = await conn.QueryAsync<InvoicePaymentEntryDto>(
+            new CommandDefinition(paymentsSql,
+                new { InvoiceId = invoiceId, TenantId = _wp.TenantId, OrganizationId = _wp.OrganizationId }, cancellationToken: ct)).ConfigureAwait(false);
+
+        var balanceDue = decimal.Round(head.TotalAmount - amountPaid, 2, MidpointRounding.AwayFromZero);
+
         return new InvoiceDetailDto(
             head.InvoiceId,
             head.InvoiceNumber,
@@ -159,8 +181,107 @@ public sealed class InvoiceRepository : IInvoiceRepository
             head.Currency,
             head.TotalAmount,
             head.Status,
-            lines.AsList());
+            lines.AsList(),
+            amountPaid,
+            balanceDue,
+            payments.AsList());
     }
+
+    public async Task<long> RecordPaymentAsync(long invoiceId, RecordInvoicePaymentRequest request, CancellationToken ct)
+    {
+        if (request.Amount <= 0)
+            throw new ArgumentException("Amount must be greater than zero.", nameof(request));
+
+        var receivedUtc = request.ReceivedUtc ?? DateTime.UtcNow;
+        var channel = string.IsNullOrWhiteSpace(request.Channel) ? null : request.Channel.Trim();
+        if (channel is { Length: > 64 })
+            channel = channel[..64];
+        var referenceNote = string.IsNullOrWhiteSpace(request.ReferenceNote) ? null : request.ReferenceNote.Trim();
+        if (referenceNote is { Length: > 256 })
+            referenceNote = referenceNote[..256];
+
+        await using var conn = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var tx = await conn.BeginTransactionAsync(ct).ConfigureAwait(false);
+
+        try
+        {
+            const string lockInv = """
+                                   SELECT InvoiceId, TotalAmount, Status
+                                   FROM dbo.Invoices WITH (UPDLOCK, ROWLOCK)
+                                   WHERE InvoiceId = @InvoiceId AND TenantId = @TenantId AND OrganizationId = @OrganizationId;
+                                   """;
+            var inv = await conn.QuerySingleOrDefaultAsync<InvLockRow>(
+                new CommandDefinition(lockInv,
+                    new { InvoiceId = invoiceId, TenantId = _wp.TenantId, OrganizationId = _wp.OrganizationId }, tx,
+                    cancellationToken: ct)).ConfigureAwait(false);
+            if (inv is null)
+                throw new InvalidOperationException("Invoice not found in this organization.");
+
+            if (string.Equals(inv.Status, "Paid", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("This invoice is already fully settled.");
+            if (!string.Equals(inv.Status, "Posted", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Settlements can only be recorded for posted invoices.");
+
+            var total = inv.TotalAmount;
+
+            const string sumPaid = """
+                                   SELECT ISNULL(SUM(Amount), 0)
+                                   FROM dbo.InvoicePayments
+                                   WHERE InvoiceId = @InvoiceId AND TenantId = @TenantId AND OrganizationId = @OrganizationId;
+                                   """;
+            var paidSoFar = await conn.ExecuteScalarAsync<decimal>(
+                new CommandDefinition(sumPaid,
+                    new { InvoiceId = invoiceId, TenantId = _wp.TenantId, OrganizationId = _wp.OrganizationId }, tx,
+                    cancellationToken: ct)).ConfigureAwait(false);
+            paidSoFar = decimal.Round(paidSoFar, 2, MidpointRounding.AwayFromZero);
+            var amt = decimal.Round(request.Amount, 2, MidpointRounding.AwayFromZero);
+            var newTotalPaid = decimal.Round(paidSoFar + amt, 2, MidpointRounding.AwayFromZero);
+            if (newTotalPaid > total + 0.01m)
+                throw new ArgumentException("This receipt would exceed the invoice total.", nameof(request));
+
+            const string insertPay = """
+                                     INSERT INTO dbo.InvoicePayments (TenantId, OrganizationId, InvoiceId, Amount, ReceivedUtc, Channel, ReferenceNote)
+                                     OUTPUT INSERTED.InvoicePaymentId
+                                     VALUES (@TenantId, @OrganizationId, @InvoiceId, @Amount, @ReceivedUtc, @Channel, @ReferenceNote);
+                                     """;
+            var paymentId = await conn.QuerySingleAsync<long>(
+                new CommandDefinition(insertPay,
+                    new
+                    {
+                        TenantId = _wp.TenantId,
+                        OrganizationId = _wp.OrganizationId,
+                        InvoiceId = invoiceId,
+                        Amount = amt,
+                        ReceivedUtc = receivedUtc,
+                        Channel = channel,
+                        ReferenceNote = referenceNote,
+                    }, tx, cancellationToken: ct)).ConfigureAwait(false);
+
+            var balance = decimal.Round(total - newTotalPaid, 2, MidpointRounding.AwayFromZero);
+            if (balance <= 0.01m)
+            {
+                const string markPaid = """
+                                        UPDATE dbo.Invoices
+                                        SET Status = N'Paid'
+                                        WHERE InvoiceId = @InvoiceId AND TenantId = @TenantId AND OrganizationId = @OrganizationId;
+                                        """;
+                await conn.ExecuteAsync(
+                    new CommandDefinition(markPaid,
+                        new { InvoiceId = invoiceId, TenantId = _wp.TenantId, OrganizationId = _wp.OrganizationId }, tx,
+                        cancellationToken: ct)).ConfigureAwait(false);
+            }
+
+            await tx.CommitAsync(ct).ConfigureAwait(false);
+            return paymentId;
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private sealed record InvLockRow(long InvoiceId, decimal TotalAmount, string Status);
 
     private sealed record InvoiceHeadRow(
         long InvoiceId,

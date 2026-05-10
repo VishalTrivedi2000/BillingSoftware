@@ -12,8 +12,13 @@ public static class BillingCoreDependencyInjection
     {
         services.AddScoped<ITenantOrganizationRepository, TenantOrganizationRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<IPartyRepository, PartyRepository>();
+        services.AddScoped<IProductCategoryRepository, ProductCategoryRepository>();
+        services.AddScoped<IProductBrandRepository, ProductBrandRepository>();
+        services.AddScoped<IProductUnitRepository, ProductUnitRepository>();
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        services.AddScoped<IPurchaseRepository, PurchaseRepository>();
         services.AddScoped<IDashboardMetricsRepository, DashboardMetricsRepository>();
         return services;
     }

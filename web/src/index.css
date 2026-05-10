@@ -26,3 +26,48 @@ html {
   background-clip: text;
   color: transparent;
 }
+
+@media print {
+  @page {
+    margin: 12mm;
+    size: A4 portrait;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #0f172a !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  #root,
+  .min-h-screen {
+    min-height: auto !important;
+    background: #fff !important;
+  }
+
+  main.flex-1 {
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .invoice-print-root {
+    padding-bottom: 0 !important;
+    max-width: none !important;
+  }
+
+  .invoice-print-surface {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    border: none !important;
+    max-width: none !important;
+  }
+
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

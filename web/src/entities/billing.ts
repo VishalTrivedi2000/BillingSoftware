@@ -26,6 +26,14 @@ export type InvoiceLineDto = {
   lineTotal: number;
 };
 
+export type InvoicePaymentEntryDto = {
+  invoicePaymentId: number;
+  amount: number;
+  receivedUtc: string;
+  channel: string | null;
+  referenceNote: string | null;
+};
+
 export type InvoiceDetailDto = {
   invoiceId: number;
   invoiceNumber: string | null;
@@ -36,6 +44,16 @@ export type InvoiceDetailDto = {
   totalAmount: number;
   status: string;
   lines: InvoiceLineDto[];
+  amountPaid: number;
+  balanceDue: number;
+  payments: InvoicePaymentEntryDto[];
+};
+
+export type RecordInvoicePaymentBody = {
+  amount: number;
+  receivedUtc?: string | null;
+  channel?: string | null;
+  referenceNote?: string | null;
 };
 
 export type CreateInvoiceLineBody = {
@@ -50,6 +68,49 @@ export type CreateInvoiceBody = {
   lines: CreateInvoiceLineBody[];
 };
 
+export type PurchaseLineDto = {
+  purchaseLineId: number;
+  productId: number | null;
+  description: string;
+  quantity: number;
+  unitCost: number;
+  lineTotal: number;
+};
+
+export type PurchaseBillSummaryDto = {
+  purchaseBillId: number;
+  purchaseNumber: string | null;
+  partyId: number;
+  supplierName: string;
+  receivedUtc: string;
+  totalAmount: number;
+  status: string;
+};
+
+export type PurchaseBillDetailDto = {
+  purchaseBillId: number;
+  purchaseNumber: string | null;
+  partyId: number;
+  supplierName: string;
+  receivedUtc: string;
+  currency: string;
+  totalAmount: number;
+  status: string;
+  lines: PurchaseLineDto[];
+};
+
+export type CreatePurchaseLineBody = {
+  productId?: number | null;
+  description: string;
+  quantity: number;
+  unitCost: number;
+};
+
+export type CreatePurchaseBillBody = {
+  partyId: number;
+  lines: CreatePurchaseLineBody[];
+};
+
 export type CustomerDto = {
   customerId: number;
   name: string;
@@ -59,11 +120,94 @@ export type CustomerDto = {
   createdUtc: string;
 };
 
+/** POST /v1/customers */
+export type CreateCustomerBody = {
+  name: string;
+  taxId: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+/** PATCH /v1/customers/{customerId} */
+export type UpdateCustomerBody = CreateCustomerBody;
+
+export type PartyDto = {
+  partyId: number;
+  kind: string;
+  displayName: string;
+  legalName: string | null;
+  taxId: string | null;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  isActive: boolean;
+  createdUtc: string;
+};
+
+export type CreatePartyBody = {
+  kind: string;
+  displayName: string;
+  legalName?: string | null;
+  taxId?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  notes?: string | null;
+};
+
+export type UpdatePartyBody = CreatePartyBody & { isActive: boolean };
+
 export type ProductDto = {
   productId: number;
   sku: string | null;
   name: string;
+  brand?: string | null;
+  brandId?: number | null;
   unitPrice: number;
+  stockQty?: number;
+  lowStockThreshold?: number | null;
+  categoryId?: number | null;
+  categoryName?: string | null;
+  unitId?: number | null;
+  unitName?: string | null;
+  primaryImageRelativePath?: string | null;
   isActive: boolean;
   createdUtc: string;
+};
+
+export type ProductCategoryDto = {
+  categoryId: number;
+  parentCategoryId: number | null;
+  slug: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+export type ProductBrandDto = {
+  brandId: number;
+  slug: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+export type ProductUnitDto = {
+  unitId: number;
+  code: string;
+  displayName: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+export type ProductBrowseResult = {
+  items: ProductDto[];
+  totalCount: number;
+};
+
+export type ProductInventorySummaryDto = {
+  totalSkus: number;
+  activeSkus: number;
+  outOfStockCount: number;
+  lowStockAlertCount: number;
+  inventoryValueAtRetail: number;
 };

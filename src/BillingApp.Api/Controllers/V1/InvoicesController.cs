@@ -52,4 +52,23 @@ public sealed class InvoicesController : ControllerBase
             return BadRequest(ex.Message);
         }
     }
+
+    [HttpPost("{invoiceId:long}/payments")]
+    [Authorize(Policy = "perm:" + PermissionNames.InvoicePaymentsRecord)]
+    public async Task<ActionResult<object>> RecordPayment(long invoiceId, [FromBody] RecordInvoicePaymentRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var paymentId = await _invoices.RecordPaymentAsync(invoiceId, request, ct).ConfigureAwait(false);
+            return CreatedAtAction(nameof(Get), new { invoiceId }, new { invoicePaymentId = paymentId });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
+    }
 }

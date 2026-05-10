@@ -114,20 +114,27 @@ public sealed class AuthDatabaseInitializer : IHostedService
         {
             PermissionNames.SystemHealth,
             PermissionNames.InvoicesCreate, PermissionNames.InvoicesRead, PermissionNames.InvoicesUpdate,
+            PermissionNames.InvoicePaymentsRecord,
+            PermissionNames.PurchasesRead,
+            PermissionNames.PurchasesCreate,
             PermissionNames.CustomersRead, PermissionNames.CustomersCreate, PermissionNames.CustomersUpdate,
             PermissionNames.ProductsRead, PermissionNames.ProductsManage,
             PermissionNames.OrganizationsRead,
             PermissionNames.OrganizationsManage,
+            PermissionNames.PartiesRead,
+            PermissionNames.PartiesManage,
         }).ConfigureAwait(false);
 
         await LinkRolePerms(RoleNames.Accountant, new[]
         {
             PermissionNames.SystemHealth,
             PermissionNames.InvoicesRead,
+            PermissionNames.PurchasesRead,
             PermissionNames.ReportsRead,
             PermissionNames.CustomersRead,
             PermissionNames.ProductsRead,
             PermissionNames.OrganizationsRead,
+            PermissionNames.PartiesRead,
         }).ConfigureAwait(false);
 
         async Task EnsureUser(string username, string password, string roleName)

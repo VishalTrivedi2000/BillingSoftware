@@ -101,12 +101,12 @@ function sessionComplete(a: AuthState): boolean {
 
 /**
  * Workspace routes require access + refresh + tenant/org (JWT workplace claims).
- * Avoid treating “access token only” as signed-in — dashboard queries would fire without org scope and loop on 401.
+ * Avoid treating access-token-only as signed-in — dashboard queries would fire without org scope and loop on 401.
  */
 export function selectIsAuthenticated(state: AuthRoot): boolean {
   if (sessionComplete(state.auth)) return true;
   const p = readPersistedAuth();
-  return Boolean(p.accessToken && p.refreshToken && p.tenantId != null && p.organizationId != null);
+  return sessionComplete(p);
 }
 
 export function selectAccessToken(state: AuthRoot): string | null {
