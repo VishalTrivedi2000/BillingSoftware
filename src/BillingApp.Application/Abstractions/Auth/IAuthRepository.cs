@@ -62,6 +62,17 @@ public interface IAuthRepository
     Task<WorkplaceRecord?> GetWorkplaceForUserAsync(long userId, long organizationId, CancellationToken ct);
 
     Task<bool> UserBelongsToWorkplaceAsync(long userId, long tenantId, long organizationId, CancellationToken ct);
+
+    Task<IReadOnlyList<(int PermissionId, string Name)>> ListAllPermissionsAsync(CancellationToken ct);
+
+    Task<IReadOnlyList<(int RoleId, string Name, string? Description, int PermissionCount, long UserCount)>> ListRolesWithStatsAsync(
+        CancellationToken ct);
+
+    Task<(int RoleId, string Name, string? Description)?> GetRoleAsync(int roleId, CancellationToken ct);
+
+    Task<IReadOnlyList<int>> GetPermissionIdsForRoleAsync(int roleId, CancellationToken ct);
+
+    Task ReplaceRolePermissionsAsync(int roleId, IReadOnlyList<int> permissionIds, CancellationToken ct);
 }
 
 public sealed record WorkplaceRecord(long TenantId, long OrganizationId);

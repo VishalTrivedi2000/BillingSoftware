@@ -44,6 +44,9 @@ public static class PolicyNames
         public const string DelegationsManage = "perm:" + PermissionNames.DelegationsManage;
         public const string UsersManage = "perm:" + PermissionNames.UsersManage;
 
+        public const string RolesRead = "perm:" + PermissionNames.RolesRead;
+        public const string RolesManage = "perm:" + PermissionNames.RolesManage;
+
         /// <summary>Read product catalog: explicit <see cref="PermissionNames.ProductsRead"/> or invoice read/create (line-item workflow).</summary>
         public const string CatalogRead = "catalog:read";
     }

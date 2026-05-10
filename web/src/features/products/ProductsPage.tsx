@@ -255,6 +255,7 @@ function ProductCatalogTile({
               {p.brand && <span aria-hidden>·</span>}
               <span className="font-mono text-[10px] text-slate-600">
                 SKU {p.sku ?? '—'} · #{p.productId}
+                {p.hsnCode ? ` · HSN ${p.hsnCode}` : ''}
               </span>
               {!p.isActive && (
                 <span className="rounded bg-slate-700 px-2 py-0.5 text-[10px] font-semibold text-slate-300">Inactive</span>
@@ -324,6 +325,8 @@ function ProductCatalogTile({
       {uploadControl}
       <p className={`font-mono text-slate-600 ${compact ? 'mt-2 text-[9px]' : 'mt-3 text-[10px]'}`}>
         SKU {p.sku ?? '—'} · #{p.productId}
+        {p.hsnCode ? ` · HSN ${p.hsnCode}` : ''}
+        {p.isService ? ' · Service' : ''}
       </p>
     </article>
   );
@@ -356,10 +359,20 @@ export function ProductsPage() {
   const [qaPrice, setQaPrice] = useState('');
   const [qaStock, setQaStock] = useState('');
   const [qaLow, setQaLow] = useState('');
+  const [qaHsn, setQaHsn] = useState('');
+  const [qaDesc, setQaDesc] = useState('');
+  const [qaMrp, setQaMrp] = useState('');
+  const [qaPurchasePrice, setQaPurchasePrice] = useState('');
+  const [qaWholesalePrice, setQaWholesalePrice] = useState('');
+  const [qaMinWholesaleQty, setQaMinWholesaleQty] = useState('');
+  const [qaTax, setQaTax] = useState('');
+  const [qaLocation, setQaLocation] = useState('');
+  const [qaIsService, setQaIsService] = useState(false);
   const [qaError, setQaError] = useState<string | null>(null);
   const [qaPhotoWarning, setQaPhotoWarning] = useState<string | null>(null);
   const [qaPhotoFiles, setQaPhotoFiles] = useState<File[]>([]);
   const qaPhotoRef = useRef<HTMLInputElement>(null);
+  const [qaSubTab, setQaSubTab] = useState<'details' | 'pricing' | 'stock'>('details');
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 350);
@@ -497,8 +510,18 @@ export function ProductsPage() {
       setQaPrice('');
       setQaStock('');
       setQaLow('');
+      setQaHsn('');
+      setQaDesc('');
+      setQaMrp('');
+      setQaPurchasePrice('');
+      setQaWholesalePrice('');
+      setQaMinWholesaleQty('');
+      setQaTax('');
+      setQaLocation('');
+      setQaIsService(false);
       setQaPhotoFiles([]);
       if (qaPhotoRef.current) qaPhotoRef.current.value = '';
+      setQaSubTab('details');
       await qc.invalidateQueries({ queryKey: ['products-browse'] });
       await qc.invalidateQueries({ queryKey: ['products-inventory-summary'] });
       await qc.invalidateQueries({ queryKey: ['products-directory'] });
@@ -600,6 +623,32 @@ export function ProductsPage() {
       setQaError('Low-stock threshold must be a non-negative number.');
       return;
     }
+
+    const parseOptDecimal = (raw: string, label: string): number | null | undefined => {
+      const t = raw.trim();
+      if (t === '') return null;
+      const n = Number(t);
+      if (!Number.isFinite(n) || n < 0) {
+        setQaError(`${label} must be empty or a non-negative number.`);
+        return undefined;
+      }
+      return n;
+    };
+
+    const mrp = parseOptDecimal(qaMrp, 'MRP');
+    if (mrp === undefined) return;
+    const purchasePrice = parseOptDecimal(qaPurchasePrice, 'Purchase price');
+    if (purchasePrice === undefined) return;
+    const wholesalePrice = parseOptDecimal(qaWholesalePrice, 'Wholesale price');
+    if (wholesalePrice === undefined) return;
+    const minWholesaleQty = parseOptDecimal(qaMinWholesaleQty, 'Min wholesale qty');
+    if (minWholesaleQty === undefined) return;
+    const taxPct = parseOptDecimal(qaTax, 'Tax %');
+    if (taxPct === undefined) return;
+    if (taxPct != null && taxPct > 100) {
+      setQaError('Tax % cannot exceed 100.');
+      return;
+    }
     if (qaPhotoFiles.length > 0) {
       for (const f of qaPhotoFiles) {
         const err = validateImageFile(f);
@@ -619,6 +668,15 @@ export function ProductsPage() {
         unitId: qaUnitId === '' ? null : qaUnitId,
         stockQty: stock,
         lowStockThreshold: low,
+        hsnCode: qaHsn.trim() || null,
+        description: qaDesc.trim() || null,
+        mrp,
+        purchasePrice,
+        wholesalePrice,
+        minWholesaleQty,
+        taxRatePercent: taxPct,
+        storageLocation: qaLocation.trim() || null,
+        isService: qaIsService,
       },
       imageFiles: qaPhotoFiles,
     });
@@ -716,89 +774,182 @@ export function ProductsPage() {
             <button type="button" className="text-violet-300 underline hover:text-violet-200" onClick={() => { setTaxonomyInitialSection('category'); setTaxonomyOpen(true); }}>
               Categories & brands
             </button>
-            .
+            . Fields are grouped like Vyapar-style item tabs (details, pricing, stock).
           </p>
-          <form className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={(ev) => void onQuickAdd(ev)}>
-            <input
-              required
-              placeholder="Product name"
-              value={qaName}
-              onChange={(e) => setQaName(e.target.value)}
-              className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-            />
-            <input
-              placeholder="SKU"
-              value={qaSku}
-              onChange={(e) => setQaSku(e.target.value)}
-              className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-            />
-            <select
-              value={qaBrandId === '' ? '' : qaBrandId}
-              onChange={(e) => setQaBrandId(e.target.value === '' ? '' : Number(e.target.value))}
-              className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-            >
-              <option value="">Brand (optional)</option>
-              {(brandsQ.data ?? [])
-                .filter((b) => b.isActive)
-                .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
-                .map((b) => (
-                  <option key={b.brandId} value={b.brandId}>
-                    {b.name}
-                  </option>
-                ))}
-            </select>
-            <select
-              value={qaCategoryId === '' ? '' : qaCategoryId}
-              onChange={(e) => setQaCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
-              className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-            >
-              <option value="">Category (optional)</option>
-              {(categoriesQ.data ?? [])
-                .filter((c) => c.isActive)
-                .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
-                .map((c) => (
-                  <option key={c.categoryId} value={c.categoryId}>
-                    {c.name}
-                  </option>
-                ))}
-            </select>
-            <select
-              value={qaUnitId === '' ? '' : qaUnitId}
-              onChange={(e) => setQaUnitId(e.target.value === '' ? '' : Number(e.target.value))}
-              className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-            >
-              <option value="">Unit (optional)</option>
-              {(unitsQ.data ?? [])
-                .filter((u) => u.isActive)
-                .sort((a, b) => a.sortOrder - b.sortOrder || a.displayName.localeCompare(b.displayName))
-                .map((u) => (
-                  <option key={u.unitId} value={u.unitId}>
-                    {u.displayName}
-                  </option>
-                ))}
-            </select>
-            <input
-              required
-              placeholder="Unit price (INR)"
-              inputMode="decimal"
-              value={qaPrice}
-              onChange={(e) => setQaPrice(e.target.value)}
-              className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-            />
-            <input
-              placeholder="Stock qty"
-              inputMode="numeric"
-              value={qaStock}
-              onChange={(e) => setQaStock(e.target.value)}
-              className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-            />
-            <input
-              placeholder="Low-stock alert qty"
-              inputMode="numeric"
-              value={qaLow}
-              onChange={(e) => setQaLow(e.target.value)}
-              className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-            />
+          <form className="mt-4 space-y-4" onSubmit={(ev) => void onQuickAdd(ev)}>
+            <div className="flex flex-wrap gap-1 rounded-xl border border-slate-700 bg-[#1a1f2e] p-1">
+              {(
+                [
+                  ['details', 'Details'],
+                  ['pricing', 'Pricing & tax'],
+                  ['stock', 'Stock & notes'],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setQaSubTab(id)}
+                  className={`rounded-lg px-3 py-2 text-xs font-semibold transition sm:text-sm ${
+                    qaSubTab === id ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {qaSubTab === 'details' && (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <input
+                  placeholder="Product name"
+                  value={qaName}
+                  onChange={(e) => setQaName(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500 sm:col-span-2"
+                />
+                <input
+                  placeholder="SKU"
+                  value={qaSku}
+                  onChange={(e) => setQaSku(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+                <input
+                  placeholder="HSN code"
+                  value={qaHsn}
+                  onChange={(e) => setQaHsn(e.target.value)}
+                  maxLength={16}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+                <select
+                  value={qaBrandId === '' ? '' : qaBrandId}
+                  onChange={(e) => setQaBrandId(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                >
+                  <option value="">Brand (optional)</option>
+                  {(brandsQ.data ?? [])
+                    .filter((b) => b.isActive)
+                    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+                    .map((b) => (
+                      <option key={b.brandId} value={b.brandId}>
+                        {b.name}
+                      </option>
+                    ))}
+                </select>
+                <select
+                  value={qaCategoryId === '' ? '' : qaCategoryId}
+                  onChange={(e) => setQaCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                >
+                  <option value="">Category (optional)</option>
+                  {(categoriesQ.data ?? [])
+                    .filter((c) => c.isActive)
+                    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+                    .map((c) => (
+                      <option key={c.categoryId} value={c.categoryId}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+                <select
+                  value={qaUnitId === '' ? '' : qaUnitId}
+                  onChange={(e) => setQaUnitId(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                >
+                  <option value="">Unit (optional)</option>
+                  {(unitsQ.data ?? [])
+                    .filter((u) => u.isActive)
+                    .sort((a, b) => a.sortOrder - b.sortOrder || a.displayName.localeCompare(b.displayName))
+                    .map((u) => (
+                      <option key={u.unitId} value={u.unitId}>
+                        {u.displayName}
+                      </option>
+                    ))}
+                </select>
+                <label className="flex items-center gap-2 rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-slate-300 sm:col-span-2">
+                  <input type="checkbox" checked={qaIsService} onChange={(e) => setQaIsService(e.target.checked)} className="rounded border-slate-600" />
+                  Service (non-stock)
+                </label>
+              </div>
+            )}
+
+            {qaSubTab === 'pricing' && (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <input
+                  placeholder="Unit price (INR)"
+                  inputMode="decimal"
+                  value={qaPrice}
+                  onChange={(e) => setQaPrice(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+                <input
+                  placeholder="Purchase / cost price"
+                  inputMode="decimal"
+                  value={qaPurchasePrice}
+                  onChange={(e) => setQaPurchasePrice(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+                <input
+                  placeholder="MRP (INR)"
+                  inputMode="decimal"
+                  value={qaMrp}
+                  onChange={(e) => setQaMrp(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+                <input
+                  placeholder="Default tax % (GST)"
+                  inputMode="decimal"
+                  value={qaTax}
+                  onChange={(e) => setQaTax(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+                <input
+                  placeholder="Wholesale price"
+                  inputMode="decimal"
+                  value={qaWholesalePrice}
+                  onChange={(e) => setQaWholesalePrice(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+                <input
+                  placeholder="Min wholesale qty"
+                  inputMode="decimal"
+                  value={qaMinWholesaleQty}
+                  onChange={(e) => setQaMinWholesaleQty(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+              </div>
+            )}
+
+            {qaSubTab === 'stock' && (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <input
+                  placeholder="Stock qty"
+                  inputMode="numeric"
+                  value={qaStock}
+                  onChange={(e) => setQaStock(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+                <input
+                  placeholder="Low-stock alert qty"
+                  inputMode="numeric"
+                  value={qaLow}
+                  onChange={(e) => setQaLow(e.target.value)}
+                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+                <input
+                  placeholder="Storage location"
+                  value={qaLocation}
+                  onChange={(e) => setQaLocation(e.target.value)}
+                  className="sm:col-span-2 rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+                <textarea
+                  placeholder="Description / notes"
+                  value={qaDesc}
+                  onChange={(e) => setQaDesc(e.target.value)}
+                  rows={3}
+                  className="sm:col-span-2 lg:col-span-4 rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
+                />
+              </div>
+            )}
+
             <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-4">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 Product photos <span className="font-normal normal-case text-slate-600">(optional, multiple)</span>
@@ -943,7 +1094,7 @@ export function ProductsPage() {
                 <input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search products, SKU, brand…"
+                  placeholder="Search products, SKU, brand, HSN…"
                   className="w-full rounded-xl border border-slate-700 bg-[#1f2937] py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-violet-500"
                 />
               </div>

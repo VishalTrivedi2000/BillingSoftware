@@ -8,7 +8,7 @@ import { useAppSelector } from '../../app/hooks';
 import { selectIsAuthenticated, selectWorkplaceSnapshot } from '../../features/auth/authSlice';
 import { apiJsonAuth } from '../../shared/api/axiosClient';
 import { InvoiceDocument } from './InvoiceDocument';
-import { downloadInvoicePdf, invoicePdfFilename } from './invoicePdf';
+import { downloadInvoicePdf, invoicePdfFilename, printInvoicePdf } from './invoicePdf';
 import { InvoiceSettlementSection } from './InvoiceSettlementSection';
 
 function fmtInr(n: number) {
@@ -31,6 +31,8 @@ export function InvoiceDetailPage() {
   const workplaceOrgId = workplace?.organizationId ?? 0;
 
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [printBusy, setPrintBusy] = useState(false);
+  const [printErr, setPrintErr] = useState<string | null>(null);
 
   const q = useQuery({
     queryKey: ['invoice-detail', id, workplaceOrgId],
@@ -76,8 +78,22 @@ export function InvoiceDetailPage() {
     }
   }
 
-  function handlePrint() {
-    window.print();
+  async function handlePrintPdf() {
+    const el = document.getElementById('invoice-print-surface');
+    if (!(el instanceof HTMLElement)) {
+      setPrintErr('Print layout not ready yet.');
+      return;
+    }
+    setPrintErr(null);
+    setPrintBusy(true);
+    try {
+      await printInvoicePdf(el);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Could not open print dialog.';
+      setPrintErr(msg.slice(0, 240));
+    } finally {
+      setPrintBusy(false);
+    }
   }
 
   if (!Number.isFinite(id) || id <= 0) {
@@ -102,11 +118,16 @@ export function InvoiceDetailPage() {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => handlePrint()}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-slate-200 shadow-sm hover:bg-white/10"
+                disabled={printBusy}
+                onClick={() => void handlePrintPdf()}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-slate-200 shadow-sm hover:bg-white/10 disabled:opacity-50"
               >
-                <Printer className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-                Print
+                {printBusy ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-slate-400" aria-hidden />
+                ) : (
+                  <Printer className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                )}
+                Print PDF…
               </button>
               <button
                 type="button"
@@ -125,6 +146,12 @@ export function InvoiceDetailPage() {
           )}
         </div>
       </div>
+
+      {printErr ? (
+        <div role="alert" className="no-print workspace-panel border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+          {printErr}
+        </div>
+      ) : null}
 
       {q.isLoading && (
         <div className="no-print workspace-panel flex items-center gap-3 px-6 py-12 text-slate-400">

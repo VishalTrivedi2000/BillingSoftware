@@ -223,7 +223,16 @@ public sealed class ProductsController : ControllerBase
             request.BrandId,
             request.UnitId,
             stock,
-            request.LowStockThreshold);
+            request.LowStockThreshold,
+            string.IsNullOrWhiteSpace(request.HsnCode) ? null : request.HsnCode.Trim(),
+            string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            request.Mrp,
+            request.PurchasePrice,
+            request.WholesalePrice,
+            request.MinWholesaleQty,
+            request.TaxRatePercent,
+            string.IsNullOrWhiteSpace(request.StorageLocation) ? null : request.StorageLocation.Trim(),
+            request.IsService);
 
         try
         {
@@ -257,7 +266,16 @@ public sealed class ProductsController : ControllerBase
             request.CategoryId,
             stock,
             request.LowStockThreshold,
-            request.IsActive);
+            request.IsActive,
+            string.IsNullOrWhiteSpace(request.HsnCode) ? null : request.HsnCode.Trim(),
+            string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            request.Mrp,
+            request.PurchasePrice,
+            request.WholesalePrice,
+            request.MinWholesaleQty,
+            request.TaxRatePercent,
+            string.IsNullOrWhiteSpace(request.StorageLocation) ? null : request.StorageLocation.Trim(),
+            request.IsService);
 
         try
         {

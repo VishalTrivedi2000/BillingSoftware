@@ -1,48 +1,13 @@
-/** Client-side PDF from the printable invoice DOM node (html2canvas + jsPDF). */
+/** Client-side PDF from the printable invoice DOM node (html2canvas-pro + jsPDF). */
+
+import { printPdfFromHtmlElement, savePdfFromHtmlElement } from '../../shared/print/htmlToPdf';
 
 export async function downloadInvoicePdf(printSurface: HTMLElement, filename: string): Promise<void> {
-  const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
-    import('jspdf'),
-    import('html2canvas'),
-  ]);
+  await savePdfFromHtmlElement(printSurface, filename);
+}
 
-  const canvas = await html2canvas(printSurface, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    backgroundColor: '#ffffff',
-    scrollX: 0,
-    scrollY: 0,
-    windowWidth: printSurface.scrollWidth,
-    windowHeight: printSurface.scrollHeight,
-  });
-
-  const imgData = canvas.toDataURL('image/png', 1.0);
-  const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
-
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
-
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-  }
-
-  pdf.save(filename);
+export async function printInvoicePdf(printSurface: HTMLElement): Promise<void> {
+  await printPdfFromHtmlElement(printSurface);
 }
 
 export function invoicePdfFilename(invoiceNumber: string | null | undefined, invoiceId: number): string {
