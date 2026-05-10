@@ -6,6 +6,13 @@ public sealed record DashboardMetricsDto(
     int InvoiceCount,
     decimal TotalInvoicedAmount);
 
+/// <summary>Receivables-oriented aggregates for the sales workspace (posted/settled invoices + receipts).</summary>
+public sealed record SalesSummaryDto(
+    int PostedInvoiceCount,
+    decimal TotalInvoicedAmount,
+    decimal TotalCollectedAmount,
+    decimal TotalOutstandingAmount);
+
 public sealed record CustomerDto(long CustomerId, string Name, string? TaxId, string? Email, string? Phone, DateTime CreatedUtc);
 
 public sealed record CreateCustomerRequest(string Name, string? TaxId, string? Email, string? Phone);
@@ -102,7 +109,16 @@ public sealed record ProductDto(
     string? UnitName,
     bool IsActive,
     string? PrimaryImageRelativePath,
-    DateTime CreatedUtc);
+    DateTime CreatedUtc,
+    string? HsnCode,
+    string? Description,
+    decimal? Mrp,
+    decimal? PurchasePrice,
+    decimal? WholesalePrice,
+    decimal? MinWholesaleQty,
+    decimal? TaxRatePercent,
+    string? StorageLocation,
+    bool IsService);
 
 public sealed record ProductImageDto(
     long ProductImageId,
@@ -121,7 +137,16 @@ public sealed record CreateProductRequest(
     long? BrandId,
     long? UnitId,
     decimal? StockQty,
-    decimal? LowStockThreshold);
+    decimal? LowStockThreshold,
+    string? HsnCode,
+    string? Description,
+    decimal? Mrp,
+    decimal? PurchasePrice,
+    decimal? WholesalePrice,
+    decimal? MinWholesaleQty,
+    decimal? TaxRatePercent,
+    string? StorageLocation,
+    bool IsService);
 
 public sealed record UpdateProductRequest(
     string? Sku,
@@ -133,7 +158,16 @@ public sealed record UpdateProductRequest(
     long? CategoryId,
     decimal StockQty,
     decimal? LowStockThreshold,
-    bool IsActive);
+    bool IsActive,
+    string? HsnCode,
+    string? Description,
+    decimal? Mrp,
+    decimal? PurchasePrice,
+    decimal? WholesalePrice,
+    decimal? MinWholesaleQty,
+    decimal? TaxRatePercent,
+    string? StorageLocation,
+    bool IsService);
 
 public sealed record ProductBrowseQuery(
     string? Search,
@@ -170,7 +204,10 @@ public sealed record InvoiceSummaryDto(
     string CustomerName,
     DateTime IssueUtc,
     decimal TotalAmount,
-    string Status);
+    string Status,
+    decimal AmountPaid,
+    decimal BalanceDue,
+    string? LastPaymentChannel);
 
 public sealed record InvoicePaymentEntryDto(
     long InvoicePaymentId,
@@ -205,6 +242,11 @@ public sealed record PurchaseLineDto(
     string Description,
     decimal Quantity,
     decimal UnitCost,
+    decimal DiscountPercent,
+    decimal DiscountAmount,
+    decimal TaxRatePercent,
+    decimal TaxableAmount,
+    decimal TaxAmount,
     decimal LineTotal);
 
 public sealed record PurchaseBillSummaryDto(
@@ -214,7 +256,9 @@ public sealed record PurchaseBillSummaryDto(
     string SupplierName,
     DateTime ReceivedUtc,
     decimal TotalAmount,
-    string Status);
+    string Status,
+    decimal AmountPaid,
+    decimal BalanceDue);
 
 public sealed record PurchaseBillDetailDto(
     long PurchaseBillId,
@@ -227,6 +271,13 @@ public sealed record PurchaseBillDetailDto(
     string Status,
     IReadOnlyList<PurchaseLineDto> Lines);
 
-public sealed record CreatePurchaseLineRequest(long? ProductId, string Description, decimal Quantity, decimal UnitCost);
+public sealed record CreatePurchaseLineRequest(
+    long? ProductId,
+    string Description,
+    decimal Quantity,
+    decimal UnitCost,
+    decimal DiscountPercent,
+    decimal DiscountAmount,
+    decimal TaxRatePercent);
 
 public sealed record CreatePurchaseBillRequest(long PartyId, IReadOnlyList<CreatePurchaseLineRequest> Lines);

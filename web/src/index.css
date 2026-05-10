@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './shared/theme/appTheme.css';
 
 html {
   scroll-behavior: smooth;
@@ -7,16 +8,6 @@ html {
 @layer base {
   html {
     font-family: 'Inter', 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  }
-}
-
-/* Dark workspace panels (AppLayout shell) */
-@layer components {
-  .workspace-panel {
-    @apply rounded-2xl border border-white/10 bg-[#12161f]/95 shadow-xl shadow-black/30;
-  }
-  .workspace-panel-soft {
-    @apply rounded-xl border border-white/10 bg-white/[0.04];
   }
 }
 

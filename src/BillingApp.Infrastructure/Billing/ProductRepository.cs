@@ -36,9 +36,11 @@ public sealed class ProductRepository : IProductRepository
             brandText = await _brands.GetNameAsync(request.BrandId.Value, ct).ConfigureAwait(false);
 
         const string sql = """
-            INSERT INTO dbo.Products (TenantId, OrganizationId, CategoryId, BrandId, UnitId, Sku, Name, Brand, UnitPrice, StockQty, LowStockThreshold)
+            INSERT INTO dbo.Products (TenantId, OrganizationId, CategoryId, BrandId, UnitId, Sku, Name, Brand, UnitPrice, StockQty, LowStockThreshold,
+              HsnCode, Description, Mrp, PurchasePrice, WholesalePrice, MinWholesaleQty, TaxRatePercent, StorageLocation, IsService)
             OUTPUT INSERTED.ProductId
-            VALUES (@TenantId, @OrganizationId, @CategoryId, @BrandId, @UnitId, @Sku, @Name, @Brand, @UnitPrice, @StockQty, @LowStockThreshold);
+            VALUES (@TenantId, @OrganizationId, @CategoryId, @BrandId, @UnitId, @Sku, @Name, @Brand, @UnitPrice, @StockQty, @LowStockThreshold,
+              @HsnCode, @Description, @Mrp, @PurchasePrice, @WholesalePrice, @MinWholesaleQty, @TaxRatePercent, @StorageLocation, @IsService);
             """;
         await using var conn = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
         return await conn.QuerySingleAsync<long>(
@@ -56,6 +58,15 @@ public sealed class ProductRepository : IProductRepository
                     request.UnitPrice,
                     StockQty = request.StockQty ?? 0,
                     request.LowStockThreshold,
+                    HsnCode = string.IsNullOrWhiteSpace(request.HsnCode) ? null : request.HsnCode.Trim(),
+                    Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+                    request.Mrp,
+                    request.PurchasePrice,
+                    request.WholesalePrice,
+                    request.MinWholesaleQty,
+                    request.TaxRatePercent,
+                    StorageLocation = string.IsNullOrWhiteSpace(request.StorageLocation) ? null : request.StorageLocation.Trim(),
+                    IsService = request.IsService,
                 }, cancellationToken: ct)).ConfigureAwait(false);
     }
 
@@ -67,7 +78,8 @@ public sealed class ProductRepository : IProductRepository
                 p.ProductId, p.Sku, p.Name, COALESCE(pb.Name, p.Brand) AS Brand, p.BrandId,
                 p.UnitPrice, p.StockQty, p.LowStockThreshold,
                 p.CategoryId, pc.Name AS CategoryName, p.UnitId, pu.DisplayName AS UnitName,
-                p.IsActive, img.PrimaryImageRelativePath, p.CreatedUtc
+                p.IsActive, img.PrimaryImageRelativePath, p.CreatedUtc,
+                p.HsnCode, p.Description, p.Mrp, p.PurchasePrice, p.WholesalePrice, p.MinWholesaleQty, p.TaxRatePercent, p.StorageLocation, p.IsService
               FROM dbo.Products p
               LEFT JOIN dbo.ProductCategories pc ON pc.CategoryId = p.CategoryId
               LEFT JOIN dbo.ProductBrands pb ON pb.BrandId = p.BrandId
@@ -86,7 +98,8 @@ public sealed class ProductRepository : IProductRepository
                 p.ProductId, p.Sku, p.Name, COALESCE(pb.Name, p.Brand) AS Brand, p.BrandId,
                 p.UnitPrice, p.StockQty, p.LowStockThreshold,
                 p.CategoryId, pc.Name AS CategoryName, p.UnitId, pu.DisplayName AS UnitName,
-                p.IsActive, img.PrimaryImageRelativePath, p.CreatedUtc
+                p.IsActive, img.PrimaryImageRelativePath, p.CreatedUtc,
+                p.HsnCode, p.Description, p.Mrp, p.PurchasePrice, p.WholesalePrice, p.MinWholesaleQty, p.TaxRatePercent, p.StorageLocation, p.IsService
               FROM dbo.Products p
               LEFT JOIN dbo.ProductCategories pc ON pc.CategoryId = p.CategoryId
               LEFT JOIN dbo.ProductBrands pb ON pb.BrandId = p.BrandId
@@ -115,7 +128,8 @@ public sealed class ProductRepository : IProductRepository
               p.ProductId, p.Sku, p.Name, COALESCE(pb.Name, p.Brand) AS Brand, p.BrandId,
               p.UnitPrice, p.StockQty, p.LowStockThreshold,
               p.CategoryId, pc.Name AS CategoryName, p.UnitId, pu.DisplayName AS UnitName,
-              p.IsActive, img.PrimaryImageRelativePath, p.CreatedUtc
+              p.IsActive, img.PrimaryImageRelativePath, p.CreatedUtc,
+              p.HsnCode, p.Description, p.Mrp, p.PurchasePrice, p.WholesalePrice, p.MinWholesaleQty, p.TaxRatePercent, p.StorageLocation, p.IsService
             FROM dbo.Products p
             LEFT JOIN dbo.ProductCategories pc ON pc.CategoryId = p.CategoryId
             LEFT JOIN dbo.ProductBrands pb ON pb.BrandId = p.BrandId
@@ -148,7 +162,10 @@ public sealed class ProductRepository : IProductRepository
         const string sql = """
             UPDATE dbo.Products
             SET CategoryId = @CategoryId, BrandId = @BrandId, UnitId = @UnitId, Sku = @Sku, Name = @Name, Brand = @Brand, UnitPrice = @UnitPrice,
-                StockQty = @StockQty, LowStockThreshold = @LowStockThreshold, IsActive = @IsActive
+                StockQty = @StockQty, LowStockThreshold = @LowStockThreshold, IsActive = @IsActive,
+                HsnCode = @HsnCode, Description = @Description, Mrp = @Mrp, PurchasePrice = @PurchasePrice,
+                WholesalePrice = @WholesalePrice, MinWholesaleQty = @MinWholesaleQty, TaxRatePercent = @TaxRatePercent,
+                StorageLocation = @StorageLocation, IsService = @IsService
             WHERE ProductId = @ProductId AND TenantId = @TenantId AND OrganizationId = @OrganizationId;
             """;
         await using var conn = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
@@ -168,6 +185,15 @@ public sealed class ProductRepository : IProductRepository
                 request.StockQty,
                 request.LowStockThreshold,
                 request.IsActive,
+                HsnCode = string.IsNullOrWhiteSpace(request.HsnCode) ? null : request.HsnCode.Trim(),
+                Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+                request.Mrp,
+                request.PurchasePrice,
+                request.WholesalePrice,
+                request.MinWholesaleQty,
+                request.TaxRatePercent,
+                StorageLocation = string.IsNullOrWhiteSpace(request.StorageLocation) ? null : request.StorageLocation.Trim(),
+                request.IsService,
             }, cancellationToken: ct)).ConfigureAwait(false);
         return n > 0;
     }
@@ -214,6 +240,15 @@ public sealed class ProductRepository : IProductRepository
                   p.IsActive,
                   img.PrimaryImageRelativePath,
                   p.CreatedUtc,
+                  p.HsnCode,
+                  p.Description,
+                  p.Mrp,
+                  p.PurchasePrice,
+                  p.WholesalePrice,
+                  p.MinWholesaleQty,
+                  p.TaxRatePercent,
+                  p.StorageLocation,
+                  p.IsService,
                   COUNT(1) OVER() AS TotalCount,
                   CASE WHEN @HasSearch = 1 AND p.Name LIKE @Prefix ESCAPE '\' THEN 0 ELSE 1 END AS RelevanceSort
                 FROM dbo.Products p
@@ -227,7 +262,7 @@ public sealed class ProductRepository : IProductRepository
                   ORDER BY pi.IsPrimary DESC, pi.SortOrder ASC, pi.ProductImageId ASC
                 ) img
                 WHERE p.TenantId = @TenantId AND p.OrganizationId = @OrganizationId
-                  AND (@HasSearch = 0 OR p.Name LIKE @Contains ESCAPE '\' OR ISNULL(p.Sku, N'') LIKE @Contains ESCAPE '\' OR ISNULL(COALESCE(pb.Name, p.Brand), N'') LIKE @Contains ESCAPE '\')
+                  AND (@HasSearch = 0 OR p.Name LIKE @Contains ESCAPE '\' OR ISNULL(p.Sku, N'') LIKE @Contains ESCAPE '\' OR ISNULL(COALESCE(pb.Name, p.Brand), N'') LIKE @Contains ESCAPE '\' OR ISNULL(p.HsnCode, N'') LIKE @Contains ESCAPE '\')
                   AND (@ActiveOnly = 0 OR p.IsActive = 1)
                   AND (@AlertsOnly = 0 OR p.StockQty <= 0 OR (p.LowStockThreshold IS NOT NULL AND p.StockQty <= p.LowStockThreshold))
                   AND (@FilterBrandId IS NULL OR p.BrandId = @FilterBrandId)
@@ -266,6 +301,15 @@ public sealed class ProductRepository : IProductRepository
                   p.IsActive,
                   img.PrimaryImageRelativePath,
                   p.CreatedUtc,
+                  p.HsnCode,
+                  p.Description,
+                  p.Mrp,
+                  p.PurchasePrice,
+                  p.WholesalePrice,
+                  p.MinWholesaleQty,
+                  p.TaxRatePercent,
+                  p.StorageLocation,
+                  p.IsService,
                   COUNT(1) OVER() AS TotalCount,
                   CASE WHEN @HasSearch = 1 AND p.Name LIKE @Prefix ESCAPE '\' THEN 0 ELSE 1 END AS RelevanceSort
                 FROM dbo.Products p
@@ -280,7 +324,7 @@ public sealed class ProductRepository : IProductRepository
                 ) img
                 WHERE p.TenantId = @TenantId AND p.OrganizationId = @OrganizationId
                   AND p.CategoryId IN (SELECT CategoryId FROM Subcats)
-                  AND (@HasSearch = 0 OR p.Name LIKE @Contains ESCAPE '\' OR ISNULL(p.Sku, N'') LIKE @Contains ESCAPE '\' OR ISNULL(COALESCE(pb.Name, p.Brand), N'') LIKE @Contains ESCAPE '\')
+                  AND (@HasSearch = 0 OR p.Name LIKE @Contains ESCAPE '\' OR ISNULL(p.Sku, N'') LIKE @Contains ESCAPE '\' OR ISNULL(COALESCE(pb.Name, p.Brand), N'') LIKE @Contains ESCAPE '\' OR ISNULL(p.HsnCode, N'') LIKE @Contains ESCAPE '\')
                   AND (@ActiveOnly = 0 OR p.IsActive = 1)
                   AND (@AlertsOnly = 0 OR p.StockQty <= 0 OR (p.LowStockThreshold IS NOT NULL AND p.StockQty <= p.LowStockThreshold))
                   AND (@FilterBrandId IS NULL OR p.BrandId = @FilterBrandId)
@@ -325,7 +369,16 @@ public sealed class ProductRepository : IProductRepository
             r.UnitName,
             r.IsActive,
             r.PrimaryImageRelativePath,
-            r.CreatedUtc)).ToList();
+            r.CreatedUtc,
+            r.HsnCode,
+            r.Description,
+            r.Mrp,
+            r.PurchasePrice,
+            r.WholesalePrice,
+            r.MinWholesaleQty,
+            r.TaxRatePercent,
+            r.StorageLocation,
+            r.IsService)).ToList();
 
         return new ProductBrowseResult(items, total);
     }
@@ -442,6 +495,15 @@ public sealed class ProductRepository : IProductRepository
         public bool IsActive { get; init; }
         public string? PrimaryImageRelativePath { get; init; }
         public DateTime CreatedUtc { get; init; }
+        public string? HsnCode { get; init; }
+        public string? Description { get; init; }
+        public decimal? Mrp { get; init; }
+        public decimal? PurchasePrice { get; init; }
+        public decimal? WholesalePrice { get; init; }
+        public decimal? MinWholesaleQty { get; init; }
+        public decimal? TaxRatePercent { get; init; }
+        public string? StorageLocation { get; init; }
+        public bool IsService { get; init; }
         public int TotalCount { get; init; }
     }
 }

@@ -109,20 +109,51 @@ public sealed class InvoiceRepository : IInvoiceRepository
         }
     }
 
-    public async Task<IReadOnlyList<InvoiceSummaryDto>> ListAsync(int skip, int take, CancellationToken ct)
+    public async Task<IReadOnlyList<InvoiceSummaryDto>> ListAsync(int skip, int take, DateTime? issueFromUtc, DateTime? issueToUtcExclusive, CancellationToken ct)
     {
         const string sql = """
-            SELECT i.InvoiceId, i.InvoiceNumber, i.CustomerId, c.Name AS CustomerName, i.IssueUtc, i.TotalAmount, i.Status
+            SELECT i.InvoiceId,
+                   i.InvoiceNumber,
+                   i.CustomerId,
+                   c.Name AS CustomerName,
+                   i.IssueUtc,
+                   i.TotalAmount,
+                   i.Status,
+                   ISNULL(paid.AmountPaid, 0) AS AmountPaid,
+                   i.TotalAmount - ISNULL(paid.AmountPaid, 0) AS BalanceDue,
+                   lp.Channel AS LastPaymentChannel
             FROM dbo.Invoices i
             INNER JOIN dbo.Customers c ON c.CustomerId = i.CustomerId AND c.TenantId = i.TenantId AND c.OrganizationId = i.OrganizationId
+            LEFT JOIN (
+                SELECT InvoiceId, SUM(Amount) AS AmountPaid
+                FROM dbo.InvoicePayments
+                WHERE TenantId = @TenantId AND OrganizationId = @OrganizationId
+                GROUP BY InvoiceId
+            ) paid ON paid.InvoiceId = i.InvoiceId
+            OUTER APPLY (
+                SELECT TOP 1 ip.Channel
+                FROM dbo.InvoicePayments ip
+                WHERE ip.InvoiceId = i.InvoiceId AND ip.TenantId = @TenantId AND ip.OrganizationId = @OrganizationId
+                ORDER BY ip.ReceivedUtc DESC, ip.InvoicePaymentId DESC
+            ) lp
             WHERE i.TenantId = @TenantId AND i.OrganizationId = @OrganizationId
+              AND (@IssueFromUtc IS NULL OR i.IssueUtc >= @IssueFromUtc)
+              AND (@IssueToUtcExclusive IS NULL OR i.IssueUtc < @IssueToUtcExclusive)
             ORDER BY i.InvoiceId DESC
             OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY;
             """;
         await using var conn = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
         var rows = await conn.QueryAsync<InvoiceSummaryDto>(
             new CommandDefinition(sql,
-                new { Skip = skip, Take = take, TenantId = _wp.TenantId, OrganizationId = _wp.OrganizationId },
+                new
+                {
+                    Skip = skip,
+                    Take = take,
+                    TenantId = _wp.TenantId,
+                    OrganizationId = _wp.OrganizationId,
+                    IssueFromUtc = issueFromUtc,
+                    IssueToUtcExclusive = issueToUtcExclusive,
+                },
                 cancellationToken: ct)).ConfigureAwait(false);
         return rows.AsList();
     }
@@ -280,6 +311,61 @@ public sealed class InvoiceRepository : IInvoiceRepository
             throw;
         }
     }
+
+    public async Task<SalesSummaryDto> GetSalesSummaryAsync(CancellationToken ct)
+    {
+        const string sql = """
+                           SELECT
+                             (
+                               SELECT COUNT(*)
+                               FROM dbo.Invoices i
+                               WHERE i.TenantId = @TenantId AND i.OrganizationId = @OrganizationId
+                                 AND i.Status IN (N'Posted', N'Paid')
+                             ) AS PostedInvoiceCount,
+                             (
+                               SELECT ISNULL(SUM(i.TotalAmount), 0)
+                               FROM dbo.Invoices i
+                               WHERE i.TenantId = @TenantId AND i.OrganizationId = @OrganizationId
+                                 AND i.Status IN (N'Posted', N'Paid')
+                             ) AS TotalInvoicedAmount,
+                             (
+                               SELECT ISNULL(SUM(p.Amount), 0)
+                               FROM dbo.InvoicePayments p
+                               WHERE p.TenantId = @TenantId AND p.OrganizationId = @OrganizationId
+                             ) AS TotalCollectedAmount,
+                             (
+                               SELECT ISNULL(SUM(CASE WHEN i.TotalAmount - ISNULL(pay.Paid, 0) > 0
+                                 THEN i.TotalAmount - ISNULL(pay.Paid, 0) ELSE 0 END), 0)
+                               FROM dbo.Invoices i
+                               LEFT JOIN (
+                                 SELECT InvoiceId, SUM(Amount) AS Paid
+                                 FROM dbo.InvoicePayments
+                                 WHERE TenantId = @TenantId AND OrganizationId = @OrganizationId
+                                 GROUP BY InvoiceId
+                               ) pay ON pay.InvoiceId = i.InvoiceId
+                               WHERE i.TenantId = @TenantId AND i.OrganizationId = @OrganizationId
+                                 AND i.Status IN (N'Posted', N'Paid')
+                             ) AS TotalOutstandingAmount;
+                           """;
+
+        await using var conn = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
+        var row = await conn.QuerySingleAsync<SalesSummaryRow>(
+                new CommandDefinition(sql,
+                    new { TenantId = _wp.TenantId, OrganizationId = _wp.OrganizationId }, cancellationToken: ct))
+            .ConfigureAwait(false);
+
+        return new SalesSummaryDto(
+            row.PostedInvoiceCount,
+            decimal.Round(row.TotalInvoicedAmount, 2, MidpointRounding.AwayFromZero),
+            decimal.Round(row.TotalCollectedAmount, 2, MidpointRounding.AwayFromZero),
+            decimal.Round(row.TotalOutstandingAmount, 2, MidpointRounding.AwayFromZero));
+    }
+
+    private sealed record SalesSummaryRow(
+        int PostedInvoiceCount,
+        decimal TotalInvoicedAmount,
+        decimal TotalCollectedAmount,
+        decimal TotalOutstandingAmount);
 
     private sealed record InvLockRow(long InvoiceId, decimal TotalAmount, string Status);
 

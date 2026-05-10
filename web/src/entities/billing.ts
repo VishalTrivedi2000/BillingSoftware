@@ -7,6 +7,14 @@ export type DashboardMetricsDto = {
   totalInvoicedAmount: number;
 };
 
+/** GET /v1/sales/summary — posted invoices + receipts in this organization */
+export type SalesSummaryDto = {
+  postedInvoiceCount: number;
+  totalInvoicedAmount: number;
+  totalCollectedAmount: number;
+  totalOutstandingAmount: number;
+};
+
 export type InvoiceSummaryDto = {
   invoiceId: number;
   invoiceNumber: string | null;
@@ -15,6 +23,9 @@ export type InvoiceSummaryDto = {
   issueUtc: string;
   totalAmount: number;
   status: string;
+  amountPaid: number;
+  balanceDue: number;
+  lastPaymentChannel: string | null;
 };
 
 export type InvoiceLineDto = {
@@ -74,6 +85,11 @@ export type PurchaseLineDto = {
   description: string;
   quantity: number;
   unitCost: number;
+  discountPercent: number;
+  discountAmount: number;
+  taxRatePercent: number;
+  taxableAmount: number;
+  taxAmount: number;
   lineTotal: number;
 };
 
@@ -85,6 +101,8 @@ export type PurchaseBillSummaryDto = {
   receivedUtc: string;
   totalAmount: number;
   status: string;
+  amountPaid: number;
+  balanceDue: number;
 };
 
 export type PurchaseBillDetailDto = {
@@ -104,6 +122,9 @@ export type CreatePurchaseLineBody = {
   description: string;
   quantity: number;
   unitCost: number;
+  discountPercent?: number;
+  discountAmount?: number;
+  taxRatePercent?: number;
 };
 
 export type CreatePurchaseBillBody = {
@@ -172,6 +193,19 @@ export type ProductDto = {
   primaryImageRelativePath?: string | null;
   isActive: boolean;
   createdUtc: string;
+  /** Harmonized System code for GST */
+  hsnCode?: string | null;
+  description?: string | null;
+  mrp?: number | null;
+  /** Default purchase / cost reference for inward bills */
+  purchasePrice?: number | null;
+  wholesalePrice?: number | null;
+  minWholesaleQty?: number | null;
+  /** Default GST % for this SKU (line-level tax still future work) */
+  taxRatePercent?: number | null;
+  storageLocation?: string | null;
+  /** When true, purchase lines do not increment StockQty */
+  isService?: boolean;
 };
 
 export type ProductCategoryDto = {

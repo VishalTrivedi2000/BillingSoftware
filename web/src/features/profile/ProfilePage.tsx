@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { WorkplaceCard } from './WorkplaceCard';
 import { apiJsonAuth, authApi } from '../../shared/api/axiosClient';
+import type { AuthUserSummary } from '../../entities/auth-types';
 import { useAppDispatch } from '../../app/hooks';
 import { clearSession } from '../../features/auth/authSlice';
 
@@ -43,6 +44,10 @@ export function ProfilePage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const [access, setAccess] = useState<AuthUserSummary | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [accessLoading, setAccessLoading] = useState(true);
 
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -87,7 +92,22 @@ export function ProfilePage() {
 
   useEffect(() => {
     void load();
+    void loadAccess();
   }, []);
+
+  async function loadAccess() {
+    setAccessError(null);
+    setAccessLoading(true);
+    try {
+      const s = await apiJsonAuth<AuthUserSummary>('/v1/auth/me');
+      setAccess(s);
+    } catch (e) {
+      setAccess(null);
+      setAccessError(e instanceof Error ? e.message : 'Could not load access context.');
+    } finally {
+      setAccessLoading(false);
+    }
+  }
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
@@ -215,6 +235,64 @@ export function ProfilePage() {
   return (
     <div className="space-y-8">
       <WorkplaceCard />
+
+      <div className="workspace-panel space-y-4 p-6">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Access &amp; ABAC</h2>
+          <p className="mt-1 text-xs text-slate-600">
+            Workplace-aware JWT claims; scoped grants attach optional <span className="font-mono">resourceScope</span> interpreted by the API (similar to LockSystem backend-driven ABAC).
+          </p>
+        </div>
+        {accessLoading ? (
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="h-4 w-4 animate-spin rounded-full border border-teal-400/30 border-t-teal-400" aria-hidden />
+            Loading access context…
+          </div>
+        ) : accessError ? (
+          <p role="alert" className="text-sm text-rose-300">
+            {accessError}
+          </p>
+        ) : access ? (
+          <>
+            <div className="grid gap-3 text-xs text-slate-400 sm:grid-cols-2">
+              <p>
+                <span className="font-semibold text-slate-500">Effective roles </span>
+                <span className="text-slate-300">{access.roles.length ? access.roles.join(', ') : '—'}</span>
+              </p>
+              <p>
+                <span className="font-semibold text-slate-500">Permission claims </span>
+                <span className="text-slate-300">{access.permissions.length}</span>
+              </p>
+            </div>
+            {access.activePermissionGrants.length > 0 ? (
+              <div className="overflow-x-auto rounded-xl border border-white/10">
+                <table className="min-w-full text-left text-xs">
+                  <thead className="border-b border-white/10 bg-white/[0.03] text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">Permission</th>
+                      <th className="px-3 py-2">Resource scope</th>
+                      <th className="px-3 py-2">Expires</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10 text-slate-300">
+                    {access.activePermissionGrants.map((g) => (
+                      <tr key={g.grantId}>
+                        <td className="px-3 py-2 font-mono text-[11px] text-teal-100">{g.permission}</td>
+                        <td className="max-w-[280px] truncate px-3 py-2 font-mono text-[10px] text-slate-500" title={g.resourceScope ?? ''}>
+                          {g.resourceScope ?? '—'}
+                        </td>
+                        <td className="px-3 py-2 text-slate-500">{g.expiresUtc ? formatUpdated(g.expiresUtc) : 'Open-ended'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-600">No active permission grants with explicit scopes.</p>
+            )}
+          </>
+        ) : null}
+      </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>

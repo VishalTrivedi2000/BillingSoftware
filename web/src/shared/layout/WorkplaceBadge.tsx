@@ -23,12 +23,12 @@ export function WorkplaceBadge() {
 
   return (
     <div
-      className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400 sm:flex"
+      className="theme-header-chip hidden items-center gap-2 rounded-xl px-3 py-2 text-xs sm:flex"
       title={`Tenant ${snap.tenantId} · Organization ${snap.organizationId}`}
     >
-      <Building2 size={14} className="shrink-0 text-blue-400/90" aria-hidden />
-      <span className="font-mono text-[11px] text-slate-500">T{snap.tenantId}</span>
-      <span className="max-w-[140px] truncate font-medium text-slate-200">{label}</span>
+      <Building2 size={14} className="shrink-0 text-[rgb(var(--accent-rgb))]" aria-hidden />
+      <span className="text-app-crumb font-mono text-[11px]">T{snap.tenantId}</span>
+      <span className="text-app-page-title max-w-[140px] truncate font-medium">{label}</span>
     </div>
   );
 }

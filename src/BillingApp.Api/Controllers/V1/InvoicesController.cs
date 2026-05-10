@@ -20,9 +20,18 @@ public sealed class InvoicesController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<InvoiceSummaryDto>>> List(
         [FromQuery] int skip = 0,
         [FromQuery] int take = 50,
+        [FromQuery] DateOnly? issueFrom = null,
+        [FromQuery] DateOnly? issueTo = null,
         CancellationToken ct = default)
     {
-        var rows = await _invoices.ListAsync(Math.Max(0, skip), Math.Clamp(take, 1, 200), ct).ConfigureAwait(false);
+        DateTime? issueFromUtc = issueFrom is null
+            ? null
+            : DateTime.SpecifyKind(issueFrom.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        DateTime? issueToUtcExclusive = issueTo is null
+            ? null
+            : DateTime.SpecifyKind(issueTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+
+        var rows = await _invoices.ListAsync(Math.Max(0, skip), Math.Clamp(take, 1, 500), issueFromUtc, issueToUtcExclusive, ct).ConfigureAwait(false);
         return Ok(rows);
     }
 

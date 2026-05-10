@@ -117,7 +117,7 @@ export function PartiesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="mx-auto w-full max-w-[1400px] space-y-8 pb-12">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-blue-400/90">Masters · Organization</p>
@@ -136,8 +136,8 @@ export function PartiesPage() {
       <section className="workspace-panel overflow-hidden p-6">
         <h3 className="text-sm font-semibold text-white">Add party</h3>
         <p className="mt-1 text-xs text-slate-500">Organization admins and seeded billing staff can onboard parties for invoicing and procurement workflows.</p>
-        <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={(ev) => void onCreate(ev)}>
-          <div className="sm:col-span-1">
+        <form className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-12" onSubmit={(ev) => void onCreate(ev)}>
+          <div className="sm:col-span-1 lg:col-span-3">
             <label className="mb-1 block text-xs font-medium text-slate-400">Kind</label>
             <select
               value={kind}
@@ -151,7 +151,7 @@ export function PartiesPage() {
               ))}
             </select>
           </div>
-          <div className="sm:col-span-1">
+          <div className="sm:col-span-1 lg:col-span-9">
             <label className="mb-1 block text-xs font-medium text-slate-400">Display name</label>
             <input
               required
@@ -161,7 +161,7 @@ export function PartiesPage() {
               className="w-full rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-blue-500"
             />
           </div>
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-2 lg:col-span-12">
             <label className="mb-1 block text-xs font-medium text-slate-400">Legal name (optional)</label>
             <input
               value={legalName}
@@ -169,7 +169,7 @@ export function PartiesPage() {
               className="w-full rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500"
             />
           </div>
-          <div>
+          <div className="lg:col-span-4">
             <label className="mb-1 block text-xs font-medium text-slate-400">Tax ID</label>
             <input
               value={taxId}
@@ -177,7 +177,7 @@ export function PartiesPage() {
               className="w-full rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500"
             />
           </div>
-          <div>
+          <div className="lg:col-span-4">
             <label className="mb-1 block text-xs font-medium text-slate-400">Phone</label>
             <input
               value={phone}
@@ -185,7 +185,7 @@ export function PartiesPage() {
               className="w-full rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500"
             />
           </div>
-          <div>
+          <div className="lg:col-span-4">
             <label className="mb-1 block text-xs font-medium text-slate-400">Email</label>
             <input
               type="email"
@@ -194,7 +194,7 @@ export function PartiesPage() {
               className="w-full rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500"
             />
           </div>
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-2 lg:col-span-12">
             <label className="mb-1 block text-xs font-medium text-slate-400">Notes</label>
             <textarea
               rows={2}
@@ -204,11 +204,11 @@ export function PartiesPage() {
             />
           </div>
           {formError && (
-            <div role="alert" className="sm:col-span-2 rounded-lg border border-rose-500/30 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
+            <div role="alert" className="sm:col-span-2 lg:col-span-12 rounded-lg border border-rose-500/30 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
               {formError}
             </div>
           )}
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-2 lg:col-span-12">
             <button
               type="submit"
               disabled={createMut.isPending || !authed}
@@ -247,7 +247,7 @@ export function PartiesPage() {
         )}
         {listQ.data && listQ.data.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+            <table className="w-full min-w-[960px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                   <th className="px-6 py-4">Display name</th>

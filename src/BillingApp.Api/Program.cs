@@ -85,6 +85,8 @@ builder.Services.AddSingleton(new AuthBootstrapOptions
         Path.Combine(migrationsDir, "011_product_taxonomy.sql"),
         Path.Combine(migrationsDir, "012_invoice_payments.sql"),
         Path.Combine(migrationsDir, "013_purchase_bills.sql"),
+        Path.Combine(migrationsDir, "014_product_inventory_extended.sql"),
+        Path.Combine(migrationsDir, "015_purchase_line_tax_discount.sql"),
     },
 });
 

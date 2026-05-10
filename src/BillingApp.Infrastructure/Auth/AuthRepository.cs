@@ -511,4 +511,132 @@ public sealed class AuthRepository : IAuthRepository
             new CommandDefinition(sql, new { UserId = userId, TenantId = tenantId, OrganizationId = organizationId }, cancellationToken: ct))
             .ConfigureAwait(false);
     }
+
+    public async Task<IReadOnlyList<(int PermissionId, string Name)>> ListAllPermissionsAsync(CancellationToken ct)
+    {
+        const string sql = """
+            SELECT PermissionId, Name
+            FROM dbo.Permissions
+            ORDER BY Name
+            """;
+        await using var c = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
+        var rows = await c.QueryAsync<(int PermissionId, string Name)>(new CommandDefinition(sql, cancellationToken: ct))
+            .ConfigureAwait(false);
+        return rows.AsList();
+    }
+
+    public async Task<IReadOnlyList<(int RoleId, string Name, string? Description, int PermissionCount, long UserCount)>> ListRolesWithStatsAsync(
+        CancellationToken ct)
+    {
+        const string sql = """
+            SELECT
+              r.RoleId AS RoleId,
+              r.Name AS Name,
+              r.Description AS Description,
+              (
+                SELECT COUNT(*)
+                FROM dbo.RolePermissions rp
+                WHERE rp.RoleId = r.RoleId
+              ) AS PermissionCount,
+              (
+                SELECT COUNT(*)
+                FROM (
+                  SELECT ur.UserId AS UserId
+                  FROM dbo.UserRoles ur
+                  WHERE ur.RoleId = r.RoleId
+                  UNION
+                  SELECT g.UserId AS UserId
+                  FROM dbo.UserRoleGrants g
+                  WHERE g.RoleId = r.RoleId
+                    AND g.RevokedUtc IS NULL
+                    AND SYSUTCDATETIME() >= g.StartsUtc
+                    AND (g.ExpiresUtc IS NULL OR SYSUTCDATETIME() < g.ExpiresUtc)
+                ) u
+              ) AS UserCount
+            FROM dbo.Roles r
+            ORDER BY r.Name
+            """;
+        await using var c = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
+        var rows =
+            await c.QueryAsync<(int RoleId, string Name, string? Description, int PermissionCount, long UserCount)>(
+                    new CommandDefinition(sql, cancellationToken: ct))
+                .ConfigureAwait(false);
+        return rows.AsList();
+    }
+
+    public async Task<(int RoleId, string Name, string? Description)?> GetRoleAsync(int roleId, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT RoleId, Name, Description
+            FROM dbo.Roles
+            WHERE RoleId = @RoleId
+            """;
+        await using var c = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
+        var row = await c.QuerySingleOrDefaultAsync<(int RoleId, string Name, string? Description)>(
+                new CommandDefinition(sql, new { RoleId = roleId }, cancellationToken: ct))
+            .ConfigureAwait(false);
+        return row.RoleId == roleId ? row : null;
+    }
+
+    public async Task<IReadOnlyList<int>> GetPermissionIdsForRoleAsync(int roleId, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT rp.PermissionId
+            FROM dbo.RolePermissions rp
+            WHERE rp.RoleId = @RoleId
+            ORDER BY rp.PermissionId
+            """;
+        await using var c = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
+        var rows = await c.QueryAsync<int>(new CommandDefinition(sql, new { RoleId = roleId }, cancellationToken: ct))
+            .ConfigureAwait(false);
+        return rows.AsList();
+    }
+
+    public async Task ReplaceRolePermissionsAsync(int roleId, IReadOnlyList<int> permissionIds, CancellationToken ct)
+    {
+        var distinct = permissionIds.Distinct().ToArray();
+        await using var c = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
+        await using var tx = await c.BeginTransactionAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (distinct.Length > 0)
+            {
+                const string validateSql = """
+                    SELECT COUNT(*)
+                    FROM dbo.Permissions
+                    WHERE PermissionId IN @Ids
+                    """;
+                var ok = await c.ExecuteScalarAsync<int>(new CommandDefinition(validateSql, new { Ids = distinct }, tx, cancellationToken: ct))
+                    .ConfigureAwait(false);
+                if (ok != distinct.Length)
+                    throw new ArgumentException("One or more permission ids are unknown.");
+            }
+
+            await c.ExecuteAsync(
+                    new CommandDefinition("DELETE FROM dbo.RolePermissions WHERE RoleId=@RoleId", new { RoleId = roleId }, tx,
+                        cancellationToken: ct))
+                .ConfigureAwait(false);
+
+            foreach (var pid in distinct)
+            {
+                await c.ExecuteAsync(
+                        new CommandDefinition(
+                            """
+                            INSERT INTO dbo.RolePermissions (RoleId, PermissionId)
+                            VALUES (@RoleId, @PermissionId)
+                            """,
+                            new { RoleId = roleId, PermissionId = pid },
+                            tx,
+                            cancellationToken: ct))
+                    .ConfigureAwait(false);
+            }
+
+            await tx.CommitAsync(ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct).ConfigureAwait(false);
+            throw;
+        }
+    }
 }
