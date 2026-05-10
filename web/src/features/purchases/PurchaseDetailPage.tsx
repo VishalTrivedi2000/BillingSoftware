@@ -126,7 +126,7 @@ export function PurchaseDetailPage() {
   const bill = q.data;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="mx-auto w-full max-w-[1400px] space-y-8 pb-12">
       <div className="no-print flex flex-wrap items-center justify-between gap-4">
         <Link to="/purchases" className="inline-flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white">
           <ArrowLeft size={16} aria-hidden />
@@ -200,7 +200,7 @@ export function PurchaseDetailPage() {
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <Link
-                  to={`/purchases/drafts/${bill.purchaseBillId}`}
+                  to={`/purchases/new?loadDraft=${bill.purchaseBillId}`}
                   className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-xs font-semibold text-white hover:bg-white/15"
                 >
                   <Pencil className="h-4 w-4" aria-hidden />

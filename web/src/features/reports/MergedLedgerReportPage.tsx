@@ -128,7 +128,7 @@ export function MergedLedgerReportPage({ headline, sub }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-1">
+    <div className="mx-auto max-w-7xl space-y-6 px-1">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-sm font-medium text-blue-400/90">Reports</p>

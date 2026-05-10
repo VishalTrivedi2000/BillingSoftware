@@ -148,7 +148,7 @@ export function DashboardPage() {
   const trendRows = invoicesQ.data ?? [];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="mx-auto max-w-[1400px] space-y-6 pb-12">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-medium text-blue-400/90">Executive overview</p>

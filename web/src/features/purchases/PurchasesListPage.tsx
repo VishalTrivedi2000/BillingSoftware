@@ -51,7 +51,7 @@ export function PurchasesListPage() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="mx-auto w-full max-w-[1400px] space-y-8 pb-12">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-emerald-400/90">Billing</p>
@@ -59,7 +59,7 @@ export function PurchasesListPage() {
             <Truck className="h-8 w-8 text-emerald-400" aria-hidden />
             Purchases
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-slate-400">
+          <p className="mt-2 max-w-none text-pretty text-sm text-slate-400">
             Drafts sync from the composer (local + debounced server). Posted bills update inventory for physical SKUs.
           </p>
           <div className="mt-3 flex flex-wrap gap-1 rounded-xl border border-white/10 bg-black/20 p-1">
@@ -69,7 +69,7 @@ export function PurchasesListPage() {
           </div>
         </div>
         <Link
-          to="/purchases/new?fresh=1"
+          to="/purchases/new"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 hover:bg-emerald-500"
         >
           <Plus size={18} aria-hidden />
@@ -93,7 +93,7 @@ export function PurchasesListPage() {
       {q.data && q.data.length === 0 && (
         <div className="workspace-panel border border-dashed border-white/15 px-6 py-12 text-center">
           <p className="text-slate-400">No purchase bills in this view.</p>
-          <Link to="/purchases/new?fresh=1" className="mt-4 inline-block text-sm font-semibold text-emerald-400 hover:underline">
+          <Link to="/purchases/new" className="mt-4 inline-block text-sm font-semibold text-emerald-400 hover:underline">
             Start a draft or posted bill
           </Link>
         </div>
@@ -102,7 +102,7 @@ export function PurchasesListPage() {
       {q.data && q.data.length > 0 && (
         <div className="workspace-panel overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] border-collapse text-left text-sm">
+            <table className="w-full min-w-[960px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                   <th className="px-6 py-3">Purchase</th>
@@ -115,7 +115,7 @@ export function PurchasesListPage() {
               <tbody>
                 {q.data.map((row) => {
                   const href =
-                    row.status === 'Draft' ? `/purchases/drafts/${row.purchaseBillId}` : `/purchases/${row.purchaseBillId}`;
+                    row.status === 'Draft' ? `/purchases/new?loadDraft=${row.purchaseBillId}` : `/purchases/${row.purchaseBillId}`;
                   const label = row.purchaseNumber ?? (row.status === 'Draft' ? `Draft #${row.purchaseBillId}` : `#${row.purchaseBillId}`);
                   return (
                     <tr key={row.purchaseBillId} className="border-b border-white/5 transition hover:bg-white/[0.03]">

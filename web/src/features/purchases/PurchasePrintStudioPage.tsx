@@ -151,7 +151,7 @@ export function PurchasePrintStudioPage() {
           <LayoutTemplate className="h-7 w-7 text-emerald-400" aria-hidden />
           Print · Purchase invoice
         </h1>
-        <p className="max-w-3xl text-sm text-slate-400">
+        <p className="max-w-none text-pretty text-sm text-slate-400">
           Controls like Vyapar: toggles on the left, template gallery and live preview on the right. Settings persist per organization in{' '}
           <span className="font-mono text-xs text-slate-500">localStorage</span>.
         </p>
