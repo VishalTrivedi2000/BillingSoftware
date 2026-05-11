@@ -5,7 +5,7 @@ type Props = {
 
 export function ReportPlaceholderPage({ title, bullets }: Props) {
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-1">
+    <div className="mx-auto max-w-7xl space-y-6 px-1">
       <div>
         <p className="text-sm font-medium text-blue-400/90">Reports</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">{title}</h1>

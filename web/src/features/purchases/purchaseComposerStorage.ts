@@ -14,7 +14,7 @@ export type StoredPurchaseLine = {
 export type PurchaseComposerSnapshotV1 = {
   v: 1;
   updatedAt: string;
-  /** Last known server draft id (resume opens /purchases/drafts/:id). */
+  /** Last known server draft id (resume opens tabbed composer with ?loadDraft=…). */
   draftPurchaseBillId: number | null;
   partyId: number | '';
   lines: StoredPurchaseLine[];

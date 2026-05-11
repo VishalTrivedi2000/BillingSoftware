@@ -28,7 +28,7 @@ export function InvoicesListPage() {
   });
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="mx-auto w-full max-w-[1400px] space-y-8 pb-12">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-medium text-blue-400/90">Billing</p>
@@ -36,7 +36,10 @@ export function InvoicesListPage() {
             <FileText className="h-8 w-8 text-blue-400" aria-hidden />
             Invoices
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-slate-400">Scoped by JWT workplace (`tenant_id` / `org_id`).</p>
+          <p className="mt-2 max-w-none text-pretty text-sm text-slate-400">
+            Scoped by JWT workplace (<span className="font-mono text-xs">tenant_id</span> /{' '}
+            <span className="font-mono text-xs">org_id</span>) — list and totals are for the active workplace only.
+          </p>
         </div>
         <Link
           to="/invoices/new"
@@ -72,7 +75,7 @@ export function InvoicesListPage() {
       {q.data && q.data.length > 0 && (
         <div className="workspace-panel overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] border-collapse text-left text-sm">
+            <table className="w-full min-w-[960px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-white/10 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                   <th className="px-6 py-3">Invoice</th>

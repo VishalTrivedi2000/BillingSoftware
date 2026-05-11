@@ -80,7 +80,7 @@ export function SalesHubPage() {
   const s = summaryQ.data;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8">
+    <div className="mx-auto max-w-[1400px] space-y-6 pb-12">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-medium text-emerald-400/90">Sales management</p>

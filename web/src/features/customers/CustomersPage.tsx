@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -96,9 +97,9 @@ function CustomerEditorModal(props: {
 
   const title = mode === 'create' ? 'New customer' : 'Edit customer';
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
       role="dialog"
       aria-modal
       onClick={(ev) => {
@@ -178,7 +179,8 @@ function CustomerEditorModal(props: {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -239,7 +241,7 @@ export function CustomersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-12">
+    <div className="mx-auto max-w-[1400px] space-y-6 pb-12">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-blue-400/90">Masters</p>
@@ -247,12 +249,12 @@ export function CustomersPage() {
             <Users className="h-8 w-8 text-blue-400" aria-hidden />
             Customers
           </h2>
-          <p className="mt-2 max-w-xl text-sm text-slate-400">
+          <p className="mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-slate-400">
             Buyers for your active organization — used when creating invoices. Add or edit records here; permissions follow{' '}
-            <span className="font-mono text-slate-500">customers.read</span>,{' '}
-            <span className="font-mono text-slate-500">customers.create</span>,{' '}
-            <span className="font-mono text-slate-500">customers.update</span>. Use{' '}
-            <span className="font-mono text-slate-500">invoices.create</span> to open new invoices from a row.
+            <span className="rounded bg-white/[0.06] px-1 font-mono text-[13px] text-slate-300">customers.read</span>,{' '}
+            <span className="rounded bg-white/[0.06] px-1 font-mono text-[13px] text-slate-300">customers.create</span>,{' '}
+            <span className="rounded bg-white/[0.06] px-1 font-mono text-[13px] text-slate-300">customers.update</span>. Use{' '}
+            <span className="rounded bg-white/[0.06] px-1 font-mono text-[13px] text-slate-300">invoices.create</span> to open new invoices from a row.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

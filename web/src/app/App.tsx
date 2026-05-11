@@ -9,13 +9,18 @@ import { LoginPage } from '../features/auth/LoginPage';
 import { LandingPage } from '../features/landing/LandingPage';
 import { ProfilePage } from '../features/profile/ProfilePage';
 import { SalesHubPage } from '../features/sales/SalesHubPage';
+import { InvoiceComposerIndexRedirect } from '../features/invoices/InvoiceComposerIndexRedirect';
+import { InvoiceComposerLayout } from '../features/invoices/InvoiceComposerLayout';
 import { InvoiceCreatePage } from '../features/invoices/InvoiceCreatePage';
 import { InvoiceDetailPage } from '../features/invoices/InvoiceDetailPage';
 import { InvoicesListPage } from '../features/invoices/InvoicesListPage';
 import { CustomersPage } from '../features/customers/CustomersPage';
 import { PartiesPage } from '../features/parties/PartiesPage';
 import { ProductsPage } from '../features/products/ProductsPage';
+import { PurchaseComposerIndexRedirect } from '../features/purchases/PurchaseComposerIndexRedirect';
+import { PurchaseComposerLayout } from '../features/purchases/PurchaseComposerLayout';
 import { PurchaseCreatePage } from '../features/purchases/PurchaseCreatePage';
+import { PurchaseDraftRedirect } from '../features/purchases/PurchaseDraftRedirect';
 import { PurchaseDetailPage } from '../features/purchases/PurchaseDetailPage';
 import { PurchasePrintStudioPage } from '../features/purchases/PurchasePrintStudioPage';
 import { PurchasesListPage } from '../features/purchases/PurchasesListPage';
@@ -131,11 +136,17 @@ export default function App() {
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/sales" element={<SalesHubPage />} />
           <Route path="/invoices" element={<InvoicesListPage />} />
-          <Route path="/invoices/new" element={<InvoiceCreatePage />} />
+          <Route path="/invoices/new" element={<InvoiceComposerLayout />}>
+            <Route index element={<InvoiceComposerIndexRedirect />} />
+            <Route path=":tabId" element={<InvoiceCreatePage />} />
+          </Route>
           <Route path="/invoices/:invoiceId" element={<InvoiceDetailPage />} />
           <Route path="/purchases" element={<PurchasesListPage />} />
-          <Route path="/purchases/drafts/:draftPurchaseBillId" element={<PurchaseCreatePage />} />
-          <Route path="/purchases/new" element={<PurchaseCreatePage />} />
+          <Route path="/purchases/new" element={<PurchaseComposerLayout />}>
+            <Route index element={<PurchaseComposerIndexRedirect />} />
+            <Route path=":tabId" element={<PurchaseCreatePage />} />
+          </Route>
+          <Route path="/purchases/drafts/:draftPurchaseBillId" element={<PurchaseDraftRedirect />} />
           <Route path="/purchases/:purchaseBillId/print" element={<PurchasePrintStudioPage />} />
           <Route path="/purchases/:purchaseBillId" element={<PurchaseDetailPage />} />
         </Route>

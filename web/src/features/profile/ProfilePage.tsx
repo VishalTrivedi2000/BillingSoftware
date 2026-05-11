@@ -233,7 +233,7 @@ export function ProfilePage() {
   const initials = (profile.displayName ?? profile.username).slice(0, 2).toUpperCase();
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-[1400px] space-y-6 pb-12">
       <WorkplaceCard />
 
       <div className="workspace-panel space-y-4 p-6">

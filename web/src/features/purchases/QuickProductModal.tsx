@@ -243,7 +243,7 @@ export function QuickProductModal({ open, onClose, lineKey, onCreated }: QuickPr
     'mt-1 w-full rounded-lg border border-white/15 bg-[#1a1f2e] px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25';
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center px-3 py-6 sm:items-center" role="dialog" aria-modal aria-labelledby="quick-product-title">
+    <div className="fixed inset-0 z-[520] flex items-end justify-center px-3 py-6 sm:items-center" role="dialog" aria-modal aria-labelledby="quick-product-title">
       <button type="button" className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} aria-label="Close" />
       <div className="relative z-10 max-h-[min(92vh,720px)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/12 bg-[#0f141f] shadow-2xl shadow-black/50">
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-white/10 bg-[#0f141f]/95 px-5 py-4 backdrop-blur">
