@@ -63,14 +63,36 @@ public sealed class InvoiceRepository : IInvoiceRepository
             decimal total = 0;
             const string insertLine = """
                 INSERT INTO dbo.InvoiceLines (InvoiceId, ProductId, Description, Quantity, UnitPrice, LineTotal)
+                OUTPUT INSERTED.InvoiceLineId
                 VALUES (@InvoiceId, @ProductId, @Description, @Quantity, @UnitPrice, @LineTotal);
+                """;
+
+            const string verifySerial = """
+                SELECT s.ProductSerialId, s.ProductVariantId, s.Status, s.PurchaseCostPerUnit
+                FROM dbo.ProductSerials s
+                WHERE s.ProductSerialId = @ProductSerialId
+                  AND s.TenantId = @TenantId AND s.OrganizationId = @OrganizationId AND s.IsDeleted = 0;
+                """;
+
+            const string insertLineSerial = """
+                INSERT INTO dbo.SalesInvoiceLineSerials (
+                    TenantId, OrganizationId, InvoiceLineId, ProductSerialId, SellingPrice, CostPrice, GrossProfit)
+                VALUES (@TenantId, @OrganizationId, @InvoiceLineId, @ProductSerialId, @SellingPrice, @CostPrice, @GrossProfit);
+                """;
+
+            const string markSerialSold = """
+                UPDATE dbo.ProductSerials
+                SET Status = N'Sold', SoldInvoiceLineId = @InvoiceLineId, UpdatedUtc = SYSUTCDATETIME()
+                WHERE ProductSerialId = @ProductSerialId
+                  AND TenantId = @TenantId AND OrganizationId = @OrganizationId AND IsDeleted = 0
+                  AND Status IN (N'Available', N'InStock');
                 """;
 
             foreach (var line in request.Lines)
             {
                 var lineTotal = decimal.Round(line.Quantity * line.UnitPrice, 2, MidpointRounding.AwayFromZero);
                 total += lineTotal;
-                await conn.ExecuteAsync(new CommandDefinition(insertLine, new
+                var invoiceLineId = await conn.QuerySingleAsync<long>(new CommandDefinition(insertLine, new
                 {
                     InvoiceId = invoiceId,
                     ProductId = line.ProductId,
@@ -79,6 +101,68 @@ public sealed class InvoiceRepository : IInvoiceRepository
                     UnitPrice = line.UnitPrice,
                     LineTotal = lineTotal,
                 }, tx, cancellationToken: ct)).ConfigureAwait(false);
+
+                var serialIds = line.ProductSerialIds;
+                if (serialIds is null || serialIds.Count == 0)
+                    continue;
+
+                if (serialIds.Count != (int)decimal.Truncate(line.Quantity))
+                    throw new InvalidOperationException(
+                        $"Line \"{line.Description.Trim()}\": quantity must match the number of IMEI/serial units selected ({serialIds.Count}).");
+
+                var seenSerials = new HashSet<long>();
+                foreach (var serialId in serialIds)
+                {
+                    if (!seenSerials.Add(serialId))
+                        throw new InvalidOperationException("Duplicate IMEI/serial on the same invoice line.");
+
+                    var serial = await conn.QuerySingleOrDefaultAsync<(long ProductSerialId, long ProductVariantId, string Status, decimal? PurchaseCostPerUnit)?>(
+                        new CommandDefinition(verifySerial,
+                            new
+                            {
+                                ProductSerialId = serialId,
+                                TenantId = _wp.TenantId,
+                                OrganizationId = _wp.OrganizationId,
+                            }, tx, cancellationToken: ct)).ConfigureAwait(false);
+
+                    if (serial is null)
+                        throw new InvalidOperationException($"IMEI/serial #{serialId} was not found.");
+
+                    if (!string.Equals(serial.Value.Status, "Available", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(serial.Value.Status, "InStock", StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidOperationException(
+                            $"IMEI/serial #{serialId} is not available (status: {serial.Value.Status}).");
+
+                    if (line.ProductVariantId is { } variantId && serial.Value.ProductVariantId != variantId)
+                        throw new InvalidOperationException(
+                            $"IMEI/serial #{serialId} does not belong to the selected variant.");
+
+                    var unitSell = line.UnitPrice;
+                    var unitCost = serial.Value.PurchaseCostPerUnit ?? 0m;
+                    var gross = decimal.Round(unitSell - unitCost, 2, MidpointRounding.AwayFromZero);
+
+                    await conn.ExecuteAsync(new CommandDefinition(insertLineSerial, new
+                    {
+                        TenantId = _wp.TenantId,
+                        OrganizationId = _wp.OrganizationId,
+                        InvoiceLineId = invoiceLineId,
+                        ProductSerialId = serialId,
+                        SellingPrice = unitSell,
+                        CostPrice = unitCost,
+                        GrossProfit = gross,
+                    }, tx, cancellationToken: ct)).ConfigureAwait(false);
+
+                    var updated = await conn.ExecuteAsync(new CommandDefinition(markSerialSold, new
+                    {
+                        InvoiceLineId = invoiceLineId,
+                        ProductSerialId = serialId,
+                        TenantId = _wp.TenantId,
+                        OrganizationId = _wp.OrganizationId,
+                    }, tx, cancellationToken: ct)).ConfigureAwait(false);
+
+                    if (updated == 0)
+                        throw new InvalidOperationException($"IMEI/serial #{serialId} could not be marked sold.");
+                }
             }
 
             total = decimal.Round(total, 2, MidpointRounding.AwayFromZero);

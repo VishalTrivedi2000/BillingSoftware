@@ -41,9 +41,10 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Data Source=AKASH\\SQLEXPRESS01;Initial Catalog=BSDB;Integrated Security=True;Trust Server Certificate=True";
+    ?? "Data Source=DESKTOP-4TKGMET;Initial Catalog=BSDB;Integrated Security=True;Trust Server Certificate=True";
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddBillingCore();
+builder.Services.AddInventoryModule();
 builder.Services.AddBillingProfiles(builder.Configuration);
 builder.Services.AddProductImages(builder.Configuration);
 
@@ -87,6 +88,11 @@ builder.Services.AddSingleton(new AuthBootstrapOptions
         Path.Combine(migrationsDir, "013_purchase_bills.sql"),
         Path.Combine(migrationsDir, "014_product_inventory_extended.sql"),
         Path.Combine(migrationsDir, "015_purchase_line_tax_discount.sql"),
+        Path.Combine(migrationsDir, "016_universal_inventory_foundation.sql"),
+        Path.Combine(migrationsDir, "017_universal_inventory_backfill.sql"),
+        Path.Combine(migrationsDir, "018_universal_inventory_extras.sql"),
+        Path.Combine(migrationsDir, "019_fix_inventory_unique_index_scope.sql"),
+        Path.Combine(migrationsDir, "020_product_catalog_extended_fields.sql"),
     },
 });
 

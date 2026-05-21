@@ -72,6 +72,8 @@ export type CreateInvoiceLineBody = {
   description: string;
   quantity: number;
   unitPrice: number;
+  productVariantId?: number | null;
+  productSerialIds?: number[] | null;
 };
 
 export type CreateInvoiceBody = {
@@ -206,6 +208,24 @@ export type ProductDto = {
   storageLocation?: string | null;
   /** When true, purchase lines do not increment StockQty */
   isService?: boolean;
+  tags?: string | null;
+  manufacturer?: string | null;
+  barcode?: string | null;
+  countryOfOrigin?: string | null;
+  internalCode?: string | null;
+  manufacturerPartNo?: string | null;
+  visibility?: string | null;
+  inventoryTrackingMode?: string | null;
+  productNature?: string | null;
+  hasVariants?: boolean;
+  allowNegativeStock?: boolean;
+  leadTimeDays?: number | null;
+  warrantyMonths?: number | null;
+  shelfLifeDays?: number | null;
+  isReturnable?: boolean;
+  reorderQty?: number | null;
+  maxStock?: number | null;
+  lowStockAlert?: boolean;
 };
 
 export type ProductCategoryDto = {

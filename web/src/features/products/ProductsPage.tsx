@@ -1,19 +1,16 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertTriangle,
   ChevronRight,
   Grid3x3,
   Layers,
-  ImagePlus,
   LayoutGrid,
   List,
   Loader2,
   Package,
-  PieChart,
+  Pencil,
   Search,
-  Warehouse,
 } from 'lucide-react';
 import axios from 'axios';
 import type { AuthUserSummary } from '../../entities/auth-types';
@@ -22,7 +19,6 @@ import type {
   ProductBrowseResult,
   ProductCategoryDto,
   ProductDto,
-  ProductInventorySummaryDto,
   ProductUnitDto,
 } from '../../entities/billing';
 import { useAppSelector } from '../../app/hooks';
@@ -88,18 +84,6 @@ function validateImageFile(file: File): string | null {
     return `Each file must be ${MAX_PRODUCT_IMAGE_BYTES / (1024 * 1024)} MB or smaller.`;
   }
   return null;
-}
-
-function dedupeFiles(files: File[]): File[] {
-  const seen = new Set<string>();
-  const out: File[] = [];
-  for (const f of files) {
-    const k = `${f.name}:${f.size}:${f.lastModified}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    out.push(f);
-  }
-  return out;
 }
 
 function stockBadge(p: ProductDto) {
@@ -169,7 +153,6 @@ function CatalogViewToggle({
 type ProductCatalogTileProps = {
   p: ProductDto;
   view: CatalogViewMode;
-  tab: 'catalog' | 'reports';
   canManageProducts: boolean;
   uploadingProductId: number | null;
   uploadMutPending: boolean;
@@ -180,7 +163,6 @@ type ProductCatalogTileProps = {
 function ProductCatalogTile({
   p,
   view,
-  tab,
   canManageProducts,
   uploadingProductId,
   uploadMutPending,
@@ -203,8 +185,30 @@ function ProductCatalogTile({
     onPickPhotos(p.productId, capped);
   }
 
-  const uploadControl =
-    canManageProducts && tab === 'catalog' ? (
+  const viewControl = (
+    <Link
+      to={`/products/${p.productId}`}
+      className={`inline-flex items-center gap-1.5 font-semibold text-slate-300 hover:text-white ${
+        view === 'list' ? 'text-[11px]' : 'text-[11px]'
+      }`}
+    >
+      View
+    </Link>
+  );
+
+  const editControl = canManageProducts ? (
+      <Link
+        to={`/products/${p.productId}/edit`}
+        className={`inline-flex items-center gap-1.5 font-semibold text-blue-400 hover:text-blue-300 ${
+          view === 'list' ? 'text-[11px]' : 'text-[11px]'
+        }`}
+      >
+        <Pencil className="h-3.5 w-3.5" aria-hidden />
+        Edit
+      </Link>
+    ) : null;
+
+  const uploadControl = canManageProducts ? (
       <label
         className={`inline-flex cursor-pointer items-center gap-2 font-semibold text-violet-300 hover:text-violet-200 ${
           view === 'list' ? 'text-[11px]' : 'mt-3 text-[11px]'
@@ -249,7 +253,11 @@ function ProductCatalogTile({
             <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-400/90">
               {p.categoryName ?? 'Uncategorized'}
             </p>
-            <h3 className="mt-0.5 text-sm font-bold leading-snug text-white">{p.name}</h3>
+            <h3 className="mt-0.5 text-sm font-bold leading-snug text-white">
+              <Link to={`/products/${p.productId}`} className="hover:text-violet-200">
+                {p.name}
+              </Link>
+            </h3>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
               {p.brand && <span>{p.brand}</span>}
               {p.brand && <span aria-hidden>·</span>}
@@ -267,6 +275,10 @@ function ProductCatalogTile({
           <p className="text-base font-bold tabular-nums text-emerald-300">{fmtInr(p.unitPrice)}</p>
           {p.unitName && <p className="text-[10px] text-slate-500">Per {p.unitName.toLowerCase()}</p>}
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">{stockBadge(p)}</div>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            {viewControl}
+            {editControl}
+          </div>
           {uploadControl}
         </div>
       </div>
@@ -301,7 +313,9 @@ function ProductCatalogTile({
           <h3
             className={`mt-1 font-bold leading-snug text-white ${compact ? 'line-clamp-2 text-xs' : 'line-clamp-2 text-sm'}`}
           >
-            {p.name}
+            <Link to={`/products/${p.productId}`} className="hover:text-violet-200">
+              {p.name}
+            </Link>
           </h3>
           {p.brand && (
             <p className={`mt-0.5 text-slate-500 ${compact ? 'text-[10px]' : 'text-xs'}`}>{p.brand}</p>
@@ -322,6 +336,10 @@ function ProductCatalogTile({
         </p>
       )}
       <div className={`flex flex-wrap items-center gap-2 ${compact ? 'mt-1.5' : 'mt-2'}`}>{stockBadge(p)}</div>
+      <div className={`flex flex-wrap items-center gap-3 ${compact ? 'mt-1' : 'mt-2'}`}>
+        {viewControl}
+        {editControl}
+      </div>
       {uploadControl}
       <p className={`font-mono text-slate-600 ${compact ? 'mt-2 text-[9px]' : 'mt-3 text-[10px]'}`}>
         SKU {p.sku ?? '—'} · #{p.productId}
@@ -338,7 +356,6 @@ export function ProductsPage() {
   const workplaceOrgId = workplace?.organizationId ?? 0;
   const qc = useQueryClient();
 
-  const [tab, setTab] = useState<'catalog' | 'reports'>('catalog');
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
@@ -351,29 +368,6 @@ export function ProductsPage() {
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [taxonomyInitialSection, setTaxonomyInitialSection] = useState<TaxonomySection>('category');
 
-  const [qaName, setQaName] = useState('');
-  const [qaSku, setQaSku] = useState('');
-  const [qaBrandId, setQaBrandId] = useState<number | ''>('');
-  const [qaUnitId, setQaUnitId] = useState<number | ''>('');
-  const [qaCategoryId, setQaCategoryId] = useState<number | ''>('');
-  const [qaPrice, setQaPrice] = useState('');
-  const [qaStock, setQaStock] = useState('');
-  const [qaLow, setQaLow] = useState('');
-  const [qaHsn, setQaHsn] = useState('');
-  const [qaDesc, setQaDesc] = useState('');
-  const [qaMrp, setQaMrp] = useState('');
-  const [qaPurchasePrice, setQaPurchasePrice] = useState('');
-  const [qaWholesalePrice, setQaWholesalePrice] = useState('');
-  const [qaMinWholesaleQty, setQaMinWholesaleQty] = useState('');
-  const [qaTax, setQaTax] = useState('');
-  const [qaLocation, setQaLocation] = useState('');
-  const [qaIsService, setQaIsService] = useState(false);
-  const [qaError, setQaError] = useState<string | null>(null);
-  const [qaPhotoWarning, setQaPhotoWarning] = useState<string | null>(null);
-  const [qaPhotoFiles, setQaPhotoFiles] = useState<File[]>([]);
-  const qaPhotoRef = useRef<HTMLInputElement>(null);
-  const [qaSubTab, setQaSubTab] = useState<'details' | 'pricing' | 'stock'>('details');
-
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 350);
     return () => window.clearTimeout(t);
@@ -381,7 +375,7 @@ export function ProductsPage() {
 
   useEffect(() => {
     setPage(0);
-  }, [debouncedSearch, categoryId, brandFilterId, unitFilterId, sort, tab]);
+  }, [debouncedSearch, categoryId, brandFilterId, unitFilterId, sort]);
 
   const categoriesQ = useQuery({
     queryKey: ['product-categories', workplaceOrgId],
@@ -415,37 +409,32 @@ export function ProductsPage() {
 
   const tree = useMemo(() => buildCategoryTree(categoriesQ.data ?? []), [categoriesQ.data]);
 
-  const browseKey =
-    tab === 'catalog'
-      ? ['products-browse', workplaceOrgId, debouncedSearch, categoryId, brandFilterId, unitFilterId, sort, page]
-      : ['products-browse-alerts', workplaceOrgId, brandFilterId, unitFilterId, page];
+  const browseKey = [
+    'products-browse',
+    workplaceOrgId,
+    debouncedSearch,
+    categoryId,
+    brandFilterId,
+    unitFilterId,
+    sort,
+    page,
+  ];
 
   const browseQ = useQuery({
     queryKey: browseKey,
     enabled: authed && workplace != null,
     queryFn: async () => {
       const params = new URLSearchParams({
-        activeOnly: tab === 'catalog' ? 'true' : 'false',
-        sort: tab === 'catalog' ? sort : 'stock_asc',
+        activeOnly: 'true',
+        sort,
         skip: String(page * PAGE_SIZE),
         take: String(PAGE_SIZE),
       });
-      if (tab === 'catalog' && debouncedSearch) params.set('q', debouncedSearch);
-      if (tab === 'catalog' && categoryId != null) params.set('categoryId', String(categoryId));
+      if (debouncedSearch) params.set('q', debouncedSearch);
+      if (categoryId != null) params.set('categoryId', String(categoryId));
       if (brandFilterId != null) params.set('brandId', String(brandFilterId));
       if (unitFilterId != null) params.set('unitId', String(unitFilterId));
-      if (tab === 'reports') params.set('alertsOnly', 'true');
       const { data } = await authApi.get<ProductBrowseResult>(`/v1/products/browse?${params.toString()}`);
-      return data;
-    },
-    retry: 1,
-  });
-
-  const summaryQ = useQuery({
-    queryKey: ['products-inventory-summary', workplaceOrgId],
-    enabled: authed && workplace != null && tab === 'reports',
-    queryFn: async () => {
-      const { data } = await authApi.get<ProductInventorySummaryDto>('/v1/products/inventory/summary');
       return data;
     },
     retry: 1,
@@ -468,74 +457,6 @@ export function ProductsPage() {
       /* ignore */
     }
   }
-
-  const createMut = useMutation({
-    mutationFn: async (vars: { body: Record<string, unknown>; imageFiles: File[] }) => {
-      const { data } = await authApi.post<{ productId: number }>('/v1/products', vars.body);
-      const productId = data?.productId;
-      const failParts: string[] = [];
-      if (productId != null && vars.imageFiles.length > 0) {
-        for (let i = 0; i < vars.imageFiles.length; i++) {
-          const file = vars.imageFiles[i]!;
-          try {
-            const fd = new FormData();
-            fd.append('file', file);
-            const qs = i === 0 ? '?primary=true' : '';
-            await authApi.post(`/v1/products/${productId}/images${qs}`, fd);
-          } catch (e) {
-            const detail = axios.isAxiosError(e)
-              ? String(e.response?.data ?? e.response?.status ?? e.message)
-              : 'Upload failed.';
-            failParts.push(`${file.name}: ${detail}`);
-          }
-        }
-      }
-      let photoWarning: string | null = null;
-      if (failParts.length > 0) {
-        photoWarning =
-          failParts.length === vars.imageFiles.length
-            ? `Product #${productId} was created, but no photos uploaded (${failParts.join('; ')}).`
-            : `Product #${productId} was created; some photos failed (${failParts.join('; ')}).`;
-      }
-      return { photoWarning };
-    },
-    onSuccess: async (result) => {
-      setQaError(null);
-      setQaPhotoWarning(result.photoWarning);
-      setQaName('');
-      setQaSku('');
-      setQaBrandId('');
-      setQaUnitId('');
-      setQaCategoryId('');
-      setQaPrice('');
-      setQaStock('');
-      setQaLow('');
-      setQaHsn('');
-      setQaDesc('');
-      setQaMrp('');
-      setQaPurchasePrice('');
-      setQaWholesalePrice('');
-      setQaMinWholesaleQty('');
-      setQaTax('');
-      setQaLocation('');
-      setQaIsService(false);
-      setQaPhotoFiles([]);
-      if (qaPhotoRef.current) qaPhotoRef.current.value = '';
-      setQaSubTab('details');
-      await qc.invalidateQueries({ queryKey: ['products-browse'] });
-      await qc.invalidateQueries({ queryKey: ['products-inventory-summary'] });
-      await qc.invalidateQueries({ queryKey: ['products-directory'] });
-      await qc.invalidateQueries({ queryKey: ['products-pick'] });
-    },
-    onError: (e: unknown) => {
-      const msg = axios.isAxiosError(e)
-        ? e.response?.status === 403
-          ? 'Need products.manage permission.'
-          : String(e.response?.data ?? e.response?.status ?? e.message)
-        : 'Could not create product.';
-      setQaError(msg);
-    },
-  });
 
   const [uploadingProductId, setUploadingProductId] = useState<number | null>(null);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
@@ -599,89 +520,6 @@ export function ProductsPage() {
     },
   });
 
-  function onQuickAdd(e: FormEvent) {
-    e.preventDefault();
-    setQaError(null);
-    setQaPhotoWarning(null);
-    const name = qaName.trim();
-    if (!name) {
-      setQaError('Name is required.');
-      return;
-    }
-    const price = Number(qaPrice);
-    if (!Number.isFinite(price) || price < 0) {
-      setQaError('Unit price must be a non-negative number.');
-      return;
-    }
-    const stock = qaStock.trim() === '' ? undefined : Number(qaStock);
-    if (stock !== undefined && (!Number.isFinite(stock) || stock < 0)) {
-      setQaError('Stock must be a non-negative number.');
-      return;
-    }
-    const low = qaLow.trim() === '' ? undefined : Number(qaLow);
-    if (low !== undefined && (!Number.isFinite(low) || low < 0)) {
-      setQaError('Low-stock threshold must be a non-negative number.');
-      return;
-    }
-
-    const parseOptDecimal = (raw: string, label: string): number | null | undefined => {
-      const t = raw.trim();
-      if (t === '') return null;
-      const n = Number(t);
-      if (!Number.isFinite(n) || n < 0) {
-        setQaError(`${label} must be empty or a non-negative number.`);
-        return undefined;
-      }
-      return n;
-    };
-
-    const mrp = parseOptDecimal(qaMrp, 'MRP');
-    if (mrp === undefined) return;
-    const purchasePrice = parseOptDecimal(qaPurchasePrice, 'Purchase price');
-    if (purchasePrice === undefined) return;
-    const wholesalePrice = parseOptDecimal(qaWholesalePrice, 'Wholesale price');
-    if (wholesalePrice === undefined) return;
-    const minWholesaleQty = parseOptDecimal(qaMinWholesaleQty, 'Min wholesale qty');
-    if (minWholesaleQty === undefined) return;
-    const taxPct = parseOptDecimal(qaTax, 'Tax %');
-    if (taxPct === undefined) return;
-    if (taxPct != null && taxPct > 100) {
-      setQaError('Tax % cannot exceed 100.');
-      return;
-    }
-    if (qaPhotoFiles.length > 0) {
-      for (const f of qaPhotoFiles) {
-        const err = validateImageFile(f);
-        if (err) {
-          setQaError(err);
-          return;
-        }
-      }
-    }
-    createMut.mutate({
-      body: {
-        sku: qaSku.trim() || null,
-        name,
-        unitPrice: price,
-        categoryId: qaCategoryId === '' ? null : qaCategoryId,
-        brandId: qaBrandId === '' ? null : qaBrandId,
-        unitId: qaUnitId === '' ? null : qaUnitId,
-        stockQty: stock,
-        lowStockThreshold: low,
-        hsnCode: qaHsn.trim() || null,
-        description: qaDesc.trim() || null,
-        mrp,
-        purchasePrice,
-        wholesalePrice,
-        minWholesaleQty,
-        taxRatePercent: taxPct,
-        storageLocation: qaLocation.trim() || null,
-        isService: qaIsService,
-      },
-      imageFiles: qaPhotoFiles,
-    });
-  }
-
   const totalPages = browseQ.data ? Math.max(1, Math.ceil(browseQ.data.totalCount / PAGE_SIZE)) : 1;
 
   function CategoryBranch({ nodes, depth }: { nodes: CatNode[]; depth: number }) {
@@ -720,8 +558,17 @@ export function ProductsPage() {
             organization. Reporting highlights low and out-of-stock SKUs.
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <Link to="/invoices/new" className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500">
+          <div className="flex flex-wrap items-end gap-3">
+          {canManageProducts && (
+            <Link
+              to="/products/new"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-blue-500"
+            >
+              <Package className="h-4 w-4" aria-hidden />
+              Create product
+            </Link>
+          )}
+          <Link to="/invoices/new" className="rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm font-semibold text-slate-100 hover:bg-slate-700">
             Use on invoice
           </Link>
           {canManageProducts && (
@@ -740,330 +587,8 @@ export function ProductsPage() {
         </div>
       </header>
 
-      <div className="flex gap-2 rounded-2xl border border-slate-800 bg-slate-900/40 p-1">
-        <button
-          type="button"
-          onClick={() => setTab('catalog')}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-            tab === 'catalog' ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <LayoutGrid className="h-4 w-4" />
-          Catalog browse
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('reports')}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-            tab === 'reports' ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <PieChart className="h-4 w-4" />
-          Inventory reporting
-        </button>
-      </div>
-
-      {tab === 'catalog' && (
-        <section className="workspace-panel overflow-hidden p-5">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
-            <Warehouse className="h-4 w-4 text-violet-400" />
-            Quick add SKU
-          </h3>
-          <p className="mt-1 text-xs text-slate-500">
-            Requires <span className="font-mono text-slate-400">products.manage</span>. Pick category, brand, and unit — create missing taxonomy via{' '}
-            <button type="button" className="text-violet-300 underline hover:text-violet-200" onClick={() => { setTaxonomyInitialSection('category'); setTaxonomyOpen(true); }}>
-              Categories & brands
-            </button>
-            . Fields are grouped like Vyapar-style item tabs (details, pricing, stock).
-          </p>
-          <form className="mt-4 space-y-4" onSubmit={(ev) => void onQuickAdd(ev)}>
-            <div className="flex flex-wrap gap-1 rounded-xl border border-slate-700 bg-[#1a1f2e] p-1">
-              {(
-                [
-                  ['details', 'Details'],
-                  ['pricing', 'Pricing & tax'],
-                  ['stock', 'Stock & notes'],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setQaSubTab(id)}
-                  className={`rounded-lg px-3 py-2 text-xs font-semibold transition sm:text-sm ${
-                    qaSubTab === id ? 'bg-violet-600 text-white shadow-md' : 'text-slate-400 hover:bg-white/10 hover:text-white'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {qaSubTab === 'details' && (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <input
-                  placeholder="Product name"
-                  value={qaName}
-                  onChange={(e) => setQaName(e.target.value)}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500 sm:col-span-2"
-                />
-                <input
-                  placeholder="SKU"
-                  value={qaSku}
-                  onChange={(e) => setQaSku(e.target.value)}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-                <input
-                  placeholder="HSN code"
-                  value={qaHsn}
-                  onChange={(e) => setQaHsn(e.target.value)}
-                  maxLength={16}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-                <select
-                  value={qaBrandId === '' ? '' : qaBrandId}
-                  onChange={(e) => setQaBrandId(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                >
-                  <option value="">Brand (optional)</option>
-                  {(brandsQ.data ?? [])
-                    .filter((b) => b.isActive)
-                    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
-                    .map((b) => (
-                      <option key={b.brandId} value={b.brandId}>
-                        {b.name}
-                      </option>
-                    ))}
-                </select>
-                <select
-                  value={qaCategoryId === '' ? '' : qaCategoryId}
-                  onChange={(e) => setQaCategoryId(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                >
-                  <option value="">Category (optional)</option>
-                  {(categoriesQ.data ?? [])
-                    .filter((c) => c.isActive)
-                    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
-                    .map((c) => (
-                      <option key={c.categoryId} value={c.categoryId}>
-                        {c.name}
-                      </option>
-                    ))}
-                </select>
-                <select
-                  value={qaUnitId === '' ? '' : qaUnitId}
-                  onChange={(e) => setQaUnitId(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                >
-                  <option value="">Unit (optional)</option>
-                  {(unitsQ.data ?? [])
-                    .filter((u) => u.isActive)
-                    .sort((a, b) => a.sortOrder - b.sortOrder || a.displayName.localeCompare(b.displayName))
-                    .map((u) => (
-                      <option key={u.unitId} value={u.unitId}>
-                        {u.displayName}
-                      </option>
-                    ))}
-                </select>
-                <label className="flex items-center gap-2 rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-slate-300 sm:col-span-2">
-                  <input type="checkbox" checked={qaIsService} onChange={(e) => setQaIsService(e.target.checked)} className="rounded border-slate-600" />
-                  Service (non-stock)
-                </label>
-              </div>
-            )}
-
-            {qaSubTab === 'pricing' && (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <input
-                  placeholder="Unit price (INR)"
-                  inputMode="decimal"
-                  value={qaPrice}
-                  onChange={(e) => setQaPrice(e.target.value)}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-                <input
-                  placeholder="Purchase / cost price"
-                  inputMode="decimal"
-                  value={qaPurchasePrice}
-                  onChange={(e) => setQaPurchasePrice(e.target.value)}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-                <input
-                  placeholder="MRP (INR)"
-                  inputMode="decimal"
-                  value={qaMrp}
-                  onChange={(e) => setQaMrp(e.target.value)}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-                <input
-                  placeholder="Default tax % (GST)"
-                  inputMode="decimal"
-                  value={qaTax}
-                  onChange={(e) => setQaTax(e.target.value)}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-                <input
-                  placeholder="Wholesale price"
-                  inputMode="decimal"
-                  value={qaWholesalePrice}
-                  onChange={(e) => setQaWholesalePrice(e.target.value)}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-                <input
-                  placeholder="Min wholesale qty"
-                  inputMode="decimal"
-                  value={qaMinWholesaleQty}
-                  onChange={(e) => setQaMinWholesaleQty(e.target.value)}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-              </div>
-            )}
-
-            {qaSubTab === 'stock' && (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <input
-                  placeholder="Stock qty"
-                  inputMode="numeric"
-                  value={qaStock}
-                  onChange={(e) => setQaStock(e.target.value)}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-                <input
-                  placeholder="Low-stock alert qty"
-                  inputMode="numeric"
-                  value={qaLow}
-                  onChange={(e) => setQaLow(e.target.value)}
-                  className="rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-                <input
-                  placeholder="Storage location"
-                  value={qaLocation}
-                  onChange={(e) => setQaLocation(e.target.value)}
-                  className="sm:col-span-2 rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-                <textarea
-                  placeholder="Description / notes"
-                  value={qaDesc}
-                  onChange={(e) => setQaDesc(e.target.value)}
-                  rows={3}
-                  className="sm:col-span-2 lg:col-span-4 rounded-xl border border-slate-700 bg-[#1f2937] px-3 py-2 text-sm text-white outline-none focus:border-violet-500"
-                />
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2 sm:col-span-2 lg:col-span-4">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Product photos <span className="font-normal normal-case text-slate-600">(optional, multiple)</span>
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-slate-600 bg-[#1f2937] px-3 py-2 text-sm text-violet-200 hover:border-violet-500/60 hover:bg-[#252f3f]">
-                  <ImagePlus className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-                  <span>Add images…</span>
-                  <input
-                    ref={qaPhotoRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    multiple
-                    className="sr-only"
-                    onChange={(ev) => {
-                      const picked = Array.from(ev.target.files ?? []);
-                      ev.target.value = '';
-                      if (picked.length === 0) return;
-                      setQaPhotoFiles((prev) =>
-                        dedupeFiles([...prev, ...picked]).slice(0, MAX_PRODUCT_IMAGES_PER_BATCH),
-                      );
-                    }}
-                  />
-                </label>
-                {qaPhotoFiles.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQaPhotoFiles([]);
-                      if (qaPhotoRef.current) qaPhotoRef.current.value = '';
-                    }}
-                    className="text-xs font-semibold text-slate-500 underline hover:text-slate-300"
-                  >
-                    Clear all
-                  </button>
-                )}
-              </div>
-              {qaPhotoFiles.length > 0 && (
-                <ul className="flex flex-wrap gap-2 text-[11px] text-slate-400">
-                  {qaPhotoFiles.map((f, idx) => (
-                    <li
-                      key={`${f.name}-${f.size}-${f.lastModified}-${idx}`}
-                      className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/20 px-2 py-1"
-                    >
-                      <span className="max-w-[140px] truncate" title={f.name}>
-                        {idx === 0 ? '★ ' : ''}
-                        {f.name}
-                      </span>
-                      <button
-                        type="button"
-                        className="shrink-0 text-rose-400 hover:text-rose-300"
-                        aria-label={`Remove ${f.name}`}
-                        onClick={() => setQaPhotoFiles((prev) => prev.filter((_, i) => i !== idx))}
-                      >
-                        ×
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="text-[11px] text-slate-600">
-                JPEG / PNG / WebP / GIF · max {MAX_PRODUCT_IMAGE_BYTES / (1024 * 1024)} MB each · up to {MAX_PRODUCT_IMAGES_PER_BATCH}{' '}
-                files · first becomes primary listing photo
-              </p>
-            </div>
-            <button
-              type="submit"
-              disabled={createMut.isPending}
-              className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
-            >
-              {createMut.isPending ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : 'Create product'}
-            </button>
-            {qaError && (
-              <p role="alert" className="sm:col-span-2 lg:col-span-4 text-sm text-rose-300">
-                {qaError}
-              </p>
-            )}
-            {qaPhotoWarning && (
-              <p role="status" className="sm:col-span-2 lg:col-span-4 text-sm text-amber-200">
-                {qaPhotoWarning}
-              </p>
-            )}
-          </form>
-        </section>
-      )}
-
-      {tab === 'reports' && summaryQ.data && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="workspace-panel p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total SKUs</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-white">{summaryQ.data.totalSkus}</p>
-          </div>
-          <div className="workspace-panel p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Active listings</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-300">{summaryQ.data.activeSkus}</p>
-          </div>
-          <div className="workspace-panel p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Out of stock</p>
-            <p className="mt-1 flex items-center gap-2 text-2xl font-bold tabular-nums text-rose-300">
-              <AlertTriangle className="h-5 w-5" />
-              {summaryQ.data.outOfStockCount}
-            </p>
-          </div>
-          <div className="workspace-panel p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Inventory value (retail)</p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-white">{fmtInr(summaryQ.data.inventoryValueAtRetail)}</p>
-            <p className="mt-1 text-xs text-slate-500">Σ unit price × stock (approximation)</p>
-          </div>
-        </div>
-      )}
-
       <div className="flex flex-col gap-6 xl:flex-row">
-        {tab === 'catalog' && (
-          <aside className="w-full shrink-0 xl:w-64">
+        <aside className="w-full shrink-0 xl:w-64">
             <div className="workspace-panel p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Shop by category</p>
               <button
@@ -1078,17 +603,15 @@ export function ProductsPage() {
               {categoriesQ.isLoading && <p className="mt-4 text-xs text-slate-500">Loading tree…</p>}
               {categoriesQ.isError && <p className="mt-4 text-xs text-rose-400">Could not load categories.</p>}
               {tree.length > 0 && (
-                <div className="mt-2 max-h-[420px] overflow-y-auto pr-1">
+                <div className="mt-2 min-h-[62vh] overflow-y-auto pr-1">
                   <CategoryBranch nodes={tree} depth={0} />
                 </div>
               )}
             </div>
-          </aside>
-        )}
+        </aside>
 
         <div className="min-w-0 flex-1 space-y-4">
-          {tab === 'catalog' && (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <input
@@ -1109,15 +632,7 @@ export function ProductsPage() {
                   </option>
                 ))}
               </select>
-            </div>
-          )}
-
-          {tab === 'reports' && (
-            <div className="rounded-xl border border-amber-500/25 bg-amber-950/30 px-4 py-3 text-sm text-amber-100">
-              <strong className="font-semibold">Replenishment queue</strong> — SKUs that are out of stock or at/below their low-stock
-              threshold (paginated below).
-            </div>
-          )}
+          </div>
 
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="flex flex-wrap items-end gap-2">
@@ -1187,7 +702,7 @@ export function ProductsPage() {
             )}
             {browseQ.data && browseQ.data.items.length === 0 && (
               <p className="px-6 py-20 text-center text-sm text-slate-500">
-                {tab === 'reports' ? 'No inventory alerts for this page.' : 'No products match these filters.'}
+                No products match these filters.
               </p>
             )}
             {browseQ.data && browseQ.data.items.length > 0 && (
@@ -1235,7 +750,6 @@ export function ProductsPage() {
                       key={p.productId}
                       p={p}
                       view={catalogView}
-                      tab={tab}
                       canManageProducts={canManageProducts}
                       uploadingProductId={uploadingProductId}
                       uploadMutPending={uploadImageMut.isPending}

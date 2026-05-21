@@ -118,7 +118,25 @@ public sealed record ProductDto(
     decimal? MinWholesaleQty,
     decimal? TaxRatePercent,
     string? StorageLocation,
-    bool IsService);
+    bool IsService,
+    string? Tags = null,
+    string? Manufacturer = null,
+    string? Barcode = null,
+    string? CountryOfOrigin = null,
+    string? InternalCode = null,
+    string? ManufacturerPartNo = null,
+    string? Visibility = null,
+    string? InventoryTrackingMode = null,
+    string? ProductNature = null,
+    bool HasVariants = false,
+    bool AllowNegativeStock = false,
+    int? LeadTimeDays = null,
+    int? WarrantyMonths = null,
+    int? ShelfLifeDays = null,
+    bool IsReturnable = true,
+    decimal? ReorderQty = null,
+    decimal? MaxStock = null,
+    bool LowStockAlert = true);
 
 public sealed record ProductImageDto(
     long ProductImageId,
@@ -146,7 +164,24 @@ public sealed record CreateProductRequest(
     decimal? MinWholesaleQty,
     decimal? TaxRatePercent,
     string? StorageLocation,
-    bool IsService);
+    bool IsService,
+    string? Tags = null,
+    string? Manufacturer = null,
+    string? Barcode = null,
+    string? CountryOfOrigin = null,
+    string? InternalCode = null,
+    string? ManufacturerPartNo = null,
+    string? Visibility = null,
+    string? InventoryTrackingMode = null,
+    string? ProductNature = null,
+    bool AllowNegativeStock = false,
+    int? LeadTimeDays = null,
+    int? WarrantyMonths = null,
+    int? ShelfLifeDays = null,
+    bool IsReturnable = true,
+    decimal? ReorderQty = null,
+    decimal? MaxStock = null,
+    bool LowStockAlert = true);
 
 public sealed record UpdateProductRequest(
     string? Sku,
@@ -167,7 +202,24 @@ public sealed record UpdateProductRequest(
     decimal? MinWholesaleQty,
     decimal? TaxRatePercent,
     string? StorageLocation,
-    bool IsService);
+    bool IsService,
+    string? Tags = null,
+    string? Manufacturer = null,
+    string? Barcode = null,
+    string? CountryOfOrigin = null,
+    string? InternalCode = null,
+    string? ManufacturerPartNo = null,
+    string? Visibility = null,
+    string? InventoryTrackingMode = null,
+    string? ProductNature = null,
+    bool AllowNegativeStock = false,
+    int? LeadTimeDays = null,
+    int? WarrantyMonths = null,
+    int? ShelfLifeDays = null,
+    bool IsReturnable = true,
+    decimal? ReorderQty = null,
+    decimal? MaxStock = null,
+    bool LowStockAlert = true);
 
 public sealed record ProductBrowseQuery(
     string? Search,
@@ -232,7 +284,13 @@ public sealed record InvoiceDetailDto(
 
 public sealed record RecordInvoicePaymentRequest(decimal Amount, DateTime? ReceivedUtc, string? Channel, string? ReferenceNote);
 
-public sealed record CreateInvoiceLineRequest(long? ProductId, string Description, decimal Quantity, decimal UnitPrice);
+public sealed record CreateInvoiceLineRequest(
+    long? ProductId,
+    string Description,
+    decimal Quantity,
+    decimal UnitPrice,
+    long? ProductVariantId = null,
+    IReadOnlyList<long>? ProductSerialIds = null);
 
 public sealed record CreateInvoiceRequest(long CustomerId, IReadOnlyList<CreateInvoiceLineRequest> Lines);
 

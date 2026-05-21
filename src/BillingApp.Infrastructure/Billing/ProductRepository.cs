@@ -8,6 +8,12 @@ namespace BillingApp.Infrastructure.Billing;
 
 public sealed class ProductRepository : IProductRepository
 {
+    private const string ExtendedSelectColumns = """
+        p.Tags, p.Manufacturer, p.Barcode, p.CountryOfOrigin, p.InternalCode, p.ManufacturerPartNo, p.Visibility,
+        p.InventoryTrackingMode, p.ProductNature, p.HasVariants, p.AllowNegativeStock,
+        p.LeadTimeDays, p.WarrantyMonths, p.ShelfLifeDays, p.IsReturnable, p.ReorderQty, p.MaxStock, p.LowStockAlert
+        """;
+
     private readonly IDbConnectionFactory _db;
     private readonly IWorkplaceContext _wp;
     private readonly IProductBrandRepository _brands;
@@ -37,49 +43,73 @@ public sealed class ProductRepository : IProductRepository
 
         const string sql = """
             INSERT INTO dbo.Products (TenantId, OrganizationId, CategoryId, BrandId, UnitId, Sku, Name, Brand, UnitPrice, StockQty, LowStockThreshold,
-              HsnCode, Description, Mrp, PurchasePrice, WholesalePrice, MinWholesaleQty, TaxRatePercent, StorageLocation, IsService)
+              HsnCode, Description, Mrp, PurchasePrice, WholesalePrice, MinWholesaleQty, TaxRatePercent, StorageLocation, IsService,
+              Tags, Manufacturer, Barcode, CountryOfOrigin, InternalCode, ManufacturerPartNo, Visibility,
+              InventoryTrackingMode, ProductNature, AllowNegativeStock, LeadTimeDays, WarrantyMonths, ShelfLifeDays,
+              IsReturnable, ReorderQty, MaxStock, LowStockAlert)
             OUTPUT INSERTED.ProductId
             VALUES (@TenantId, @OrganizationId, @CategoryId, @BrandId, @UnitId, @Sku, @Name, @Brand, @UnitPrice, @StockQty, @LowStockThreshold,
-              @HsnCode, @Description, @Mrp, @PurchasePrice, @WholesalePrice, @MinWholesaleQty, @TaxRatePercent, @StorageLocation, @IsService);
+              @HsnCode, @Description, @Mrp, @PurchasePrice, @WholesalePrice, @MinWholesaleQty, @TaxRatePercent, @StorageLocation, @IsService,
+              @Tags, @Manufacturer, @Barcode, @CountryOfOrigin, @InternalCode, @ManufacturerPartNo, @Visibility,
+              @InventoryTrackingMode, @ProductNature, @AllowNegativeStock, @LeadTimeDays, @WarrantyMonths, @ShelfLifeDays,
+              @IsReturnable, @ReorderQty, @MaxStock, @LowStockAlert);
             """;
+        var ext = BuildExtendedWriteFields(request);
         await using var conn = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
         return await conn.QuerySingleAsync<long>(
-            new CommandDefinition(sql,
-                new
-                {
-                    TenantId = _wp.TenantId,
-                    OrganizationId = _wp.OrganizationId,
-                    CategoryId = request.CategoryId,
-                    BrandId = request.BrandId,
-                    UnitId = request.UnitId,
-                    request.Sku,
-                    request.Name,
-                    Brand = brandText,
-                    request.UnitPrice,
-                    StockQty = request.StockQty ?? 0,
-                    request.LowStockThreshold,
-                    HsnCode = string.IsNullOrWhiteSpace(request.HsnCode) ? null : request.HsnCode.Trim(),
-                    Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
-                    request.Mrp,
-                    request.PurchasePrice,
-                    request.WholesalePrice,
-                    request.MinWholesaleQty,
-                    request.TaxRatePercent,
-                    StorageLocation = string.IsNullOrWhiteSpace(request.StorageLocation) ? null : request.StorageLocation.Trim(),
-                    IsService = request.IsService,
-                }, cancellationToken: ct)).ConfigureAwait(false);
+            new CommandDefinition(sql, new
+            {
+                TenantId = _wp.TenantId,
+                OrganizationId = _wp.OrganizationId,
+                CategoryId = request.CategoryId,
+                BrandId = request.BrandId,
+                UnitId = request.UnitId,
+                request.Sku,
+                request.Name,
+                Brand = brandText,
+                request.UnitPrice,
+                StockQty = request.StockQty ?? 0,
+                request.LowStockThreshold,
+                HsnCode = TrimOrNull(request.HsnCode),
+                Description = TrimOrNull(request.Description),
+                request.Mrp,
+                request.PurchasePrice,
+                request.WholesalePrice,
+                request.MinWholesaleQty,
+                request.TaxRatePercent,
+                StorageLocation = TrimOrNull(request.StorageLocation),
+                IsService = request.IsService,
+                ext.Tags,
+                ext.Manufacturer,
+                ext.Barcode,
+                ext.CountryOfOrigin,
+                ext.InternalCode,
+                ext.ManufacturerPartNo,
+                ext.Visibility,
+                ext.InventoryTrackingMode,
+                ext.ProductNature,
+                ext.AllowNegativeStock,
+                ext.LeadTimeDays,
+                ext.WarrantyMonths,
+                ext.ShelfLifeDays,
+                ext.IsReturnable,
+                ext.ReorderQty,
+                ext.MaxStock,
+                ext.LowStockAlert,
+            }, cancellationToken: ct)).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<ProductDto>> ListAsync(bool activeOnly, int maxRows, CancellationToken ct)
     {
         var sql = activeOnly
-            ? """
+            ? $"""
               SELECT TOP (@Max)
                 p.ProductId, p.Sku, p.Name, COALESCE(pb.Name, p.Brand) AS Brand, p.BrandId,
                 p.UnitPrice, p.StockQty, p.LowStockThreshold,
                 p.CategoryId, pc.Name AS CategoryName, p.UnitId, pu.DisplayName AS UnitName,
                 p.IsActive, img.PrimaryImageRelativePath, p.CreatedUtc,
-                p.HsnCode, p.Description, p.Mrp, p.PurchasePrice, p.WholesalePrice, p.MinWholesaleQty, p.TaxRatePercent, p.StorageLocation, p.IsService
+                p.HsnCode, p.Description, p.Mrp, p.PurchasePrice, p.WholesalePrice, p.MinWholesaleQty, p.TaxRatePercent, p.StorageLocation, p.IsService,
+                {ExtendedSelectColumns}
               FROM dbo.Products p
               LEFT JOIN dbo.ProductCategories pc ON pc.CategoryId = p.CategoryId
               LEFT JOIN dbo.ProductBrands pb ON pb.BrandId = p.BrandId
@@ -93,13 +123,14 @@ public sealed class ProductRepository : IProductRepository
               WHERE p.TenantId = @TenantId AND p.OrganizationId = @OrganizationId AND p.IsActive = 1
               ORDER BY p.ProductId DESC;
               """
-            : """
+            : $"""
               SELECT TOP (@Max)
                 p.ProductId, p.Sku, p.Name, COALESCE(pb.Name, p.Brand) AS Brand, p.BrandId,
                 p.UnitPrice, p.StockQty, p.LowStockThreshold,
                 p.CategoryId, pc.Name AS CategoryName, p.UnitId, pu.DisplayName AS UnitName,
                 p.IsActive, img.PrimaryImageRelativePath, p.CreatedUtc,
-                p.HsnCode, p.Description, p.Mrp, p.PurchasePrice, p.WholesalePrice, p.MinWholesaleQty, p.TaxRatePercent, p.StorageLocation, p.IsService
+                p.HsnCode, p.Description, p.Mrp, p.PurchasePrice, p.WholesalePrice, p.MinWholesaleQty, p.TaxRatePercent, p.StorageLocation, p.IsService,
+                {ExtendedSelectColumns}
               FROM dbo.Products p
               LEFT JOIN dbo.ProductCategories pc ON pc.CategoryId = p.CategoryId
               LEFT JOIN dbo.ProductBrands pb ON pb.BrandId = p.BrandId
@@ -123,13 +154,14 @@ public sealed class ProductRepository : IProductRepository
 
     public async Task<ProductDto?> GetAsync(long productId, CancellationToken ct)
     {
-        const string sql = """
+        var sql = $"""
             SELECT
               p.ProductId, p.Sku, p.Name, COALESCE(pb.Name, p.Brand) AS Brand, p.BrandId,
               p.UnitPrice, p.StockQty, p.LowStockThreshold,
               p.CategoryId, pc.Name AS CategoryName, p.UnitId, pu.DisplayName AS UnitName,
               p.IsActive, img.PrimaryImageRelativePath, p.CreatedUtc,
-              p.HsnCode, p.Description, p.Mrp, p.PurchasePrice, p.WholesalePrice, p.MinWholesaleQty, p.TaxRatePercent, p.StorageLocation, p.IsService
+              p.HsnCode, p.Description, p.Mrp, p.PurchasePrice, p.WholesalePrice, p.MinWholesaleQty, p.TaxRatePercent, p.StorageLocation, p.IsService,
+              {ExtendedSelectColumns}
             FROM dbo.Products p
             LEFT JOIN dbo.ProductCategories pc ON pc.CategoryId = p.CategoryId
             LEFT JOIN dbo.ProductBrands pb ON pb.BrandId = p.BrandId
@@ -165,10 +197,17 @@ public sealed class ProductRepository : IProductRepository
                 StockQty = @StockQty, LowStockThreshold = @LowStockThreshold, IsActive = @IsActive,
                 HsnCode = @HsnCode, Description = @Description, Mrp = @Mrp, PurchasePrice = @PurchasePrice,
                 WholesalePrice = @WholesalePrice, MinWholesaleQty = @MinWholesaleQty, TaxRatePercent = @TaxRatePercent,
-                StorageLocation = @StorageLocation, IsService = @IsService
+                StorageLocation = @StorageLocation, IsService = @IsService,
+                Tags = @Tags, Manufacturer = @Manufacturer, Barcode = @Barcode, CountryOfOrigin = @CountryOfOrigin,
+                InternalCode = @InternalCode, ManufacturerPartNo = @ManufacturerPartNo, Visibility = @Visibility,
+                InventoryTrackingMode = @InventoryTrackingMode, ProductNature = @ProductNature,
+                AllowNegativeStock = @AllowNegativeStock, LeadTimeDays = @LeadTimeDays, WarrantyMonths = @WarrantyMonths,
+                ShelfLifeDays = @ShelfLifeDays, IsReturnable = @IsReturnable, ReorderQty = @ReorderQty, MaxStock = @MaxStock,
+                LowStockAlert = @LowStockAlert
             WHERE ProductId = @ProductId AND TenantId = @TenantId AND OrganizationId = @OrganizationId;
             """;
         await using var conn = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
+        var write = BuildExtendedWriteFields(request);
         var n = await conn.ExecuteAsync(
             new CommandDefinition(sql, new
             {
@@ -185,15 +224,32 @@ public sealed class ProductRepository : IProductRepository
                 request.StockQty,
                 request.LowStockThreshold,
                 request.IsActive,
-                HsnCode = string.IsNullOrWhiteSpace(request.HsnCode) ? null : request.HsnCode.Trim(),
-                Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+                HsnCode = TrimOrNull(request.HsnCode),
+                Description = TrimOrNull(request.Description),
                 request.Mrp,
                 request.PurchasePrice,
                 request.WholesalePrice,
                 request.MinWholesaleQty,
                 request.TaxRatePercent,
-                StorageLocation = string.IsNullOrWhiteSpace(request.StorageLocation) ? null : request.StorageLocation.Trim(),
+                StorageLocation = TrimOrNull(request.StorageLocation),
                 request.IsService,
+                write.Tags,
+                write.Manufacturer,
+                write.Barcode,
+                write.CountryOfOrigin,
+                write.InternalCode,
+                write.ManufacturerPartNo,
+                write.Visibility,
+                write.InventoryTrackingMode,
+                write.ProductNature,
+                write.AllowNegativeStock,
+                write.LeadTimeDays,
+                write.WarrantyMonths,
+                write.ShelfLifeDays,
+                write.IsReturnable,
+                write.ReorderQty,
+                write.MaxStock,
+                write.LowStockAlert,
             }, cancellationToken: ct)).ConfigureAwait(false);
         return n > 0;
     }
@@ -249,6 +305,7 @@ public sealed class ProductRepository : IProductRepository
                   p.TaxRatePercent,
                   p.StorageLocation,
                   p.IsService,
+                  {ExtendedSelectColumns},
                   COUNT(1) OVER() AS TotalCount,
                   CASE WHEN @HasSearch = 1 AND p.Name LIKE @Prefix ESCAPE '\' THEN 0 ELSE 1 END AS RelevanceSort
                 FROM dbo.Products p
@@ -310,6 +367,7 @@ public sealed class ProductRepository : IProductRepository
                   p.TaxRatePercent,
                   p.StorageLocation,
                   p.IsService,
+                  {ExtendedSelectColumns},
                   COUNT(1) OVER() AS TotalCount,
                   CASE WHEN @HasSearch = 1 AND p.Name LIKE @Prefix ESCAPE '\' THEN 0 ELSE 1 END AS RelevanceSort
                 FROM dbo.Products p
@@ -354,31 +412,7 @@ public sealed class ProductRepository : IProductRepository
 
         var list = rows.AsList();
         var total = list.Count > 0 ? list[0].TotalCount : 0;
-        var items = list.Select(r => new ProductDto(
-            r.ProductId,
-            r.Sku,
-            r.Name,
-            r.Brand,
-            r.BrandId,
-            r.UnitPrice,
-            r.StockQty,
-            r.LowStockThreshold,
-            r.CategoryId,
-            r.CategoryName,
-            r.UnitId,
-            r.UnitName,
-            r.IsActive,
-            r.PrimaryImageRelativePath,
-            r.CreatedUtc,
-            r.HsnCode,
-            r.Description,
-            r.Mrp,
-            r.PurchasePrice,
-            r.WholesalePrice,
-            r.MinWholesaleQty,
-            r.TaxRatePercent,
-            r.StorageLocation,
-            r.IsService)).ToList();
+        var items = list.Select(MapBrowseRow).ToList();
 
         return new ProductBrowseResult(items, total);
     }
@@ -504,6 +538,128 @@ public sealed class ProductRepository : IProductRepository
         public decimal? TaxRatePercent { get; init; }
         public string? StorageLocation { get; init; }
         public bool IsService { get; init; }
+        public string? Tags { get; init; }
+        public string? Manufacturer { get; init; }
+        public string? Barcode { get; init; }
+        public string? CountryOfOrigin { get; init; }
+        public string? InternalCode { get; init; }
+        public string? ManufacturerPartNo { get; init; }
+        public string? Visibility { get; init; }
+        public string? InventoryTrackingMode { get; init; }
+        public string? ProductNature { get; init; }
+        public bool HasVariants { get; init; }
+        public bool AllowNegativeStock { get; init; }
+        public int? LeadTimeDays { get; init; }
+        public int? WarrantyMonths { get; init; }
+        public int? ShelfLifeDays { get; init; }
+        public bool IsReturnable { get; init; }
+        public decimal? ReorderQty { get; init; }
+        public decimal? MaxStock { get; init; }
+        public bool LowStockAlert { get; init; }
         public int TotalCount { get; init; }
     }
+
+    private static ProductDto MapBrowseRow(ProductBrowseRow r) => new(
+        r.ProductId,
+        r.Sku,
+        r.Name,
+        r.Brand,
+        r.BrandId,
+        r.UnitPrice,
+        r.StockQty,
+        r.LowStockThreshold,
+        r.CategoryId,
+        r.CategoryName,
+        r.UnitId,
+        r.UnitName,
+        r.IsActive,
+        r.PrimaryImageRelativePath,
+        r.CreatedUtc,
+        r.HsnCode,
+        r.Description,
+        r.Mrp,
+        r.PurchasePrice,
+        r.WholesalePrice,
+        r.MinWholesaleQty,
+        r.TaxRatePercent,
+        r.StorageLocation,
+        r.IsService,
+        r.Tags,
+        r.Manufacturer,
+        r.Barcode,
+        r.CountryOfOrigin,
+        r.InternalCode,
+        r.ManufacturerPartNo,
+        r.Visibility,
+        r.InventoryTrackingMode,
+        r.ProductNature,
+        r.HasVariants,
+        r.AllowNegativeStock,
+        r.LeadTimeDays,
+        r.WarrantyMonths,
+        r.ShelfLifeDays,
+        r.IsReturnable,
+        r.ReorderQty,
+        r.MaxStock,
+        r.LowStockAlert);
+
+    private sealed record ExtendedWriteFields(
+        string? Tags,
+        string? Manufacturer,
+        string? Barcode,
+        string? CountryOfOrigin,
+        string? InternalCode,
+        string? ManufacturerPartNo,
+        string? Visibility,
+        string InventoryTrackingMode,
+        string ProductNature,
+        bool AllowNegativeStock,
+        int? LeadTimeDays,
+        int? WarrantyMonths,
+        int? ShelfLifeDays,
+        bool IsReturnable,
+        decimal? ReorderQty,
+        decimal? MaxStock,
+        bool LowStockAlert);
+
+    private static ExtendedWriteFields BuildExtendedWriteFields(CreateProductRequest request) => new(
+        TrimOrNull(request.Tags),
+        TrimOrNull(request.Manufacturer),
+        TrimOrNull(request.Barcode),
+        TrimOrNull(request.CountryOfOrigin),
+        TrimOrNull(request.InternalCode),
+        TrimOrNull(request.ManufacturerPartNo),
+        TrimOrNull(request.Visibility),
+        string.IsNullOrWhiteSpace(request.InventoryTrackingMode) ? "Quantity" : request.InventoryTrackingMode.Trim(),
+        string.IsNullOrWhiteSpace(request.ProductNature) ? (request.IsService ? "Service" : "Physical") : request.ProductNature.Trim(),
+        request.AllowNegativeStock,
+        request.LeadTimeDays,
+        request.WarrantyMonths,
+        request.ShelfLifeDays,
+        request.IsReturnable,
+        request.ReorderQty,
+        request.MaxStock,
+        request.LowStockAlert);
+
+    private static ExtendedWriteFields BuildExtendedWriteFields(UpdateProductRequest request) => new(
+        TrimOrNull(request.Tags),
+        TrimOrNull(request.Manufacturer),
+        TrimOrNull(request.Barcode),
+        TrimOrNull(request.CountryOfOrigin),
+        TrimOrNull(request.InternalCode),
+        TrimOrNull(request.ManufacturerPartNo),
+        TrimOrNull(request.Visibility),
+        string.IsNullOrWhiteSpace(request.InventoryTrackingMode) ? "Quantity" : request.InventoryTrackingMode.Trim(),
+        string.IsNullOrWhiteSpace(request.ProductNature) ? (request.IsService ? "Service" : "Physical") : request.ProductNature.Trim(),
+        request.AllowNegativeStock,
+        request.LeadTimeDays,
+        request.WarrantyMonths,
+        request.ShelfLifeDays,
+        request.IsReturnable,
+        request.ReorderQty,
+        request.MaxStock,
+        request.LowStockAlert);
+
+    private static string? TrimOrNull(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

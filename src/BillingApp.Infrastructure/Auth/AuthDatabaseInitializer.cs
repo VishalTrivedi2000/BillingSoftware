@@ -49,11 +49,12 @@ public sealed class AuthDatabaseInitializer : IHostedService
             }
 
             var sql = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
-            await SqlMapper.ExecuteAsync(conn, sql).ConfigureAwait(false);
+            await ExecuteSqlBatchesAsync(conn, sql, cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("Applied auth schema from {Path}", path);
         }
 
         await EnsureTenancySchemaAsync(conn, _logger, cancellationToken).ConfigureAwait(false);
+        await EnsureProductCatalogColumnsAsync(conn, _bootstrap, _logger, cancellationToken).ConfigureAwait(false);
 
         await SeedAsync(repo, hasher, cancellationToken).ConfigureAwait(false);
     }
@@ -84,6 +85,108 @@ public sealed class AuthDatabaseInitializer : IHostedService
                 "Database is missing tenancy columns (TenantId / OrganizationId). " +
                 "Apply db/migrations/007_tenant_organization.sql to this database. " +
                 "If the API was published, ensure db/migrations/*.sql is copied beside the binary (see BillingApp.Api.csproj).");
+        }
+    }
+
+    private static async Task EnsureProductCatalogColumnsAsync(
+        DbConnection conn,
+        AuthBootstrapOptions bootstrap,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        const string checkSql = """
+            SELECT CASE
+              WHEN OBJECT_ID(N'dbo.Products', N'U') IS NULL THEN 1
+              WHEN COL_LENGTH(N'dbo.Products', N'Manufacturer') IS NULL THEN 0
+              ELSE 1
+            END;
+            """;
+
+        var ok = await conn.ExecuteScalarAsync<int>(new CommandDefinition(checkSql, cancellationToken: ct))
+            .ConfigureAwait(false);
+        if (ok == 1)
+            return;
+
+        var migration020 = bootstrap.AdditionalSchemaSqlPaths?
+            .FirstOrDefault(static p => p.EndsWith("020_product_catalog_extended_fields.sql", StringComparison.OrdinalIgnoreCase));
+
+        if (migration020 is not null && File.Exists(migration020))
+        {
+            logger.LogWarning(
+                "Product catalog columns (Manufacturer, Tags, …) are missing; applying {Path}.",
+                migration020);
+            var sql = await File.ReadAllTextAsync(migration020, ct).ConfigureAwait(false);
+            await ExecuteSqlBatchesAsync(conn, sql, ct).ConfigureAwait(false);
+            return;
+        }
+
+        logger.LogWarning(
+            "Product catalog columns missing and migration 020 file not found; applying inline schema patch.");
+
+        const string inlineSql = """
+            IF OBJECT_ID(N'dbo.Products', N'U') IS NOT NULL
+            BEGIN
+              IF COL_LENGTH(N'dbo.Products', N'Tags') IS NULL
+                ALTER TABLE dbo.Products ADD Tags NVARCHAR(500) NULL;
+              IF COL_LENGTH(N'dbo.Products', N'Manufacturer') IS NULL
+                ALTER TABLE dbo.Products ADD Manufacturer NVARCHAR(128) NULL;
+              IF COL_LENGTH(N'dbo.Products', N'Barcode') IS NULL
+                ALTER TABLE dbo.Products ADD Barcode NVARCHAR(80) NULL;
+              IF COL_LENGTH(N'dbo.Products', N'CountryOfOrigin') IS NULL
+                ALTER TABLE dbo.Products ADD CountryOfOrigin NVARCHAR(64) NULL;
+              IF COL_LENGTH(N'dbo.Products', N'InternalCode') IS NULL
+                ALTER TABLE dbo.Products ADD InternalCode NVARCHAR(64) NULL;
+              IF COL_LENGTH(N'dbo.Products', N'ManufacturerPartNo') IS NULL
+                ALTER TABLE dbo.Products ADD ManufacturerPartNo NVARCHAR(80) NULL;
+              IF COL_LENGTH(N'dbo.Products', N'Visibility') IS NULL
+                ALTER TABLE dbo.Products ADD Visibility NVARCHAR(64) NULL;
+              IF COL_LENGTH(N'dbo.Products', N'AllowNegativeStock') IS NULL
+                ALTER TABLE dbo.Products ADD AllowNegativeStock BIT NOT NULL
+                  CONSTRAINT DF_Products_AllowNegativeStock DEFAULT (0);
+              IF COL_LENGTH(N'dbo.Products', N'LeadTimeDays') IS NULL
+                ALTER TABLE dbo.Products ADD LeadTimeDays INT NULL;
+              IF COL_LENGTH(N'dbo.Products', N'WarrantyMonths') IS NULL
+                ALTER TABLE dbo.Products ADD WarrantyMonths INT NULL;
+              IF COL_LENGTH(N'dbo.Products', N'ShelfLifeDays') IS NULL
+                ALTER TABLE dbo.Products ADD ShelfLifeDays INT NULL;
+              IF COL_LENGTH(N'dbo.Products', N'IsReturnable') IS NULL
+                ALTER TABLE dbo.Products ADD IsReturnable BIT NOT NULL
+                  CONSTRAINT DF_Products_IsReturnable DEFAULT (1);
+              IF COL_LENGTH(N'dbo.Products', N'ReorderQty') IS NULL
+                ALTER TABLE dbo.Products ADD ReorderQty DECIMAL(18,4) NULL;
+              IF COL_LENGTH(N'dbo.Products', N'MaxStock') IS NULL
+                ALTER TABLE dbo.Products ADD MaxStock DECIMAL(18,4) NULL;
+              IF COL_LENGTH(N'dbo.Products', N'LowStockAlert') IS NULL
+                ALTER TABLE dbo.Products ADD LowStockAlert BIT NOT NULL
+                  CONSTRAINT DF_Products_LowStockAlert DEFAULT (1);
+            END
+            """;
+
+        await SqlMapper.ExecuteAsync(conn, inlineSql).ConfigureAwait(false);
+
+        const string backfillSql = """
+            IF OBJECT_ID(N'dbo.Products', N'U') IS NOT NULL
+               AND COL_LENGTH(N'dbo.Products', N'Manufacturer') IS NOT NULL
+            BEGIN
+              UPDATE dbo.Products
+              SET Manufacturer = Brand
+              WHERE Manufacturer IS NULL AND BrandId IS NULL AND Brand IS NOT NULL;
+            END
+            """;
+
+        await SqlMapper.ExecuteAsync(conn, backfillSql).ConfigureAwait(false);
+        logger.LogInformation("Applied inline product catalog column patch on dbo.Products.");
+    }
+
+    private static async Task ExecuteSqlBatchesAsync(DbConnection conn, string sql, CancellationToken ct)
+    {
+        var batches = sql.Split(new[] { "\r\nGO\r\n", "\nGO\n", "\r\nGO\n", "\nGO\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var batch in batches)
+        {
+            var trimmed = batch.Trim();
+            if (trimmed.Length == 0)
+                continue;
+            await SqlMapper.ExecuteAsync(conn, new CommandDefinition(trimmed, cancellationToken: ct)).ConfigureAwait(false);
         }
     }
 
@@ -123,6 +226,9 @@ public sealed class AuthDatabaseInitializer : IHostedService
             PermissionNames.OrganizationsManage,
             PermissionNames.PartiesRead,
             PermissionNames.PartiesManage,
+            PermissionNames.InventoryView,
+            PermissionNames.WarehousesRead,
+            PermissionNames.ReportsInventory,
         }).ConfigureAwait(false);
 
         await LinkRolePerms(RoleNames.Accountant, new[]
