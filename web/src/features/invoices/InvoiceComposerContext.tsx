@@ -28,9 +28,18 @@ function isDraftLine(v: unknown): v is InvoiceComposerDraft['lines'][0] {
   );
 }
 
+function optNum(v: unknown, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+}
+
+function optId(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
 function reviveDraft(raw: unknown): InvoiceComposerDraft | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
+  const base = defaultComposerDraft();
   const customerRaw = o.customerId;
   const customerId: number | '' =
     customerRaw === '' || customerRaw == null
@@ -40,15 +49,69 @@ function reviveDraft(raw: unknown): InvoiceComposerDraft | null {
         : '';
   const linesRaw = o.lines;
   if (!Array.isArray(linesRaw) || linesRaw.length === 0) return null;
-  const lines = linesRaw.filter(isDraftLine).map((l) => ({
-    key: l.key,
-    productId: typeof l.productId === 'number' && Number.isFinite(l.productId) ? l.productId : null,
-    description: l.description,
-    quantity: typeof l.quantity === 'number' && Number.isFinite(l.quantity) ? l.quantity : 1,
-    unitPrice: typeof l.unitPrice === 'number' && Number.isFinite(l.unitPrice) ? l.unitPrice : 0,
-  }));
+  const lines = linesRaw.filter(isDraftLine).map((l) => {
+    const row = l as Record<string, unknown>;
+    const serialsRaw = row.selectedSerials;
+    const selectedSerials = Array.isArray(serialsRaw)
+      ? serialsRaw
+          .filter((s): s is InvoiceComposerDraft['lines'][0]['selectedSerials'][0] => {
+            return (
+              !!s &&
+              typeof s === 'object' &&
+              typeof (s as { productSerialId?: unknown }).productSerialId === 'number' &&
+              typeof (s as { serialNumber?: unknown }).serialNumber === 'string'
+            );
+          })
+          .map((s) => ({
+            productSerialId: s.productSerialId,
+            serialNumber: s.serialNumber,
+            imei2: typeof s.imei2 === 'string' ? s.imei2 : null,
+            warehouseName: typeof s.warehouseName === 'string' ? s.warehouseName : null,
+            purchaseCostPerUnit:
+              typeof s.purchaseCostPerUnit === 'number' && Number.isFinite(s.purchaseCostPerUnit)
+                ? s.purchaseCostPerUnit
+                : null,
+          }))
+      : [];
+    return {
+      key: l.key,
+      productId: optId(l.productId),
+      productVariantId: optId(row.productVariantId),
+      description: l.description,
+      quantity: optNum(l.quantity, 1),
+      unitPrice: optNum(l.unitPrice, 0),
+      discountPercent: optNum(row.discountPercent, 0),
+      taxRatePercent: optNum(row.taxRatePercent, 0),
+      selectedSerials,
+    };
+  });
   if (lines.length === 0) return null;
-  return { customerId, lines };
+  const whRaw = o.warehouseId;
+  const warehouseId: number | '' =
+    whRaw === '' || whRaw == null
+      ? ''
+      : typeof whRaw === 'number' && Number.isFinite(whRaw)
+        ? whRaw
+        : '';
+  return {
+    ...base,
+    customerId,
+    billingAddress: typeof o.billingAddress === 'string' ? o.billingAddress : base.billingAddress,
+    gstin: typeof o.gstin === 'string' ? o.gstin : base.gstin,
+    warehouseId,
+    orderDate: typeof o.orderDate === 'string' ? o.orderDate : base.orderDate,
+    dueDate: typeof o.dueDate === 'string' ? o.dueDate : base.dueDate,
+    paymentMethod: typeof o.paymentMethod === 'string' ? o.paymentMethod : base.paymentMethod,
+    salesChannel: typeof o.salesChannel === 'string' ? o.salesChannel : base.salesChannel,
+    reference: typeof o.reference === 'string' ? o.reference : base.reference,
+    shippingAmount: optNum(o.shippingAmount, 0),
+    documentDiscount: optNum(o.documentDiscount, 0),
+    amountPaid: optNum(o.amountPaid, 0),
+    shipToDifferent: o.shipToDifferent === true,
+    deliveryRecipient: typeof o.deliveryRecipient === 'string' ? o.deliveryRecipient : '',
+    deliveryAddress: typeof o.deliveryAddress === 'string' ? o.deliveryAddress : '',
+    lines,
+  };
 }
 
 function loadPersisted(): PersistedShape | null {

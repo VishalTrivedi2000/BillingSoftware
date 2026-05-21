@@ -46,6 +46,30 @@ function crumbTrail(pathname: string): string[] {
   if (pathname === '/customers') return ['Billing workspace', 'Customers'];
   if (pathname === '/parties') return ['Billing workspace', 'Parties'];
   if (pathname === '/products') return ['Billing workspace', 'Products'];
+  if (pathname === '/products/new') return ['Billing workspace', 'Products', 'Create product'];
+  if (pathname.startsWith('/products/') && pathname.endsWith('/edit'))
+    return ['Billing workspace', 'Products', 'Edit product'];
+  if (/^\/products\/\d+$/.test(pathname)) return ['Billing workspace', 'Products', 'Product view'];
+  if (pathname === '/partners') return ['Billing workspace', 'Partners'];
+  if (pathname === '/inventory') return ['Billing workspace', 'Inventory', 'Dashboard'];
+  if (pathname.startsWith('/inventory/balances')) return ['Billing workspace', 'Inventory', 'Balances'];
+  if (pathname.startsWith('/inventory/ledger')) return ['Billing workspace', 'Inventory', 'Ledger'];
+  if (pathname.startsWith('/inventory/warehouses')) return ['Billing workspace', 'Inventory', 'Warehouses'];
+  if (pathname.startsWith('/inventory/variants')) return ['Billing workspace', 'Inventory', 'Variants'];
+  if (pathname.startsWith('/inventory/batches')) return ['Billing workspace', 'Inventory', 'Batches'];
+  if (pathname.startsWith('/inventory/serials')) return ['Billing workspace', 'Inventory', 'Serials'];
+  if (pathname.startsWith('/inventory/adjustments')) return ['Billing workspace', 'Inventory', 'Adjustment'];
+  if (pathname.startsWith('/inventory/transfers/new')) return ['Billing workspace', 'Inventory', 'Transfers', 'New'];
+  if (pathname.startsWith('/inventory/transfers')) return ['Billing workspace', 'Inventory', 'Transfers'];
+  if (pathname.startsWith('/inventory/reservations')) return ['Billing workspace', 'Inventory', 'Reservations'];
+  if (pathname.startsWith('/inventory/returns/sales')) return ['Billing workspace', 'Inventory', 'Sales return'];
+  if (pathname.startsWith('/inventory/returns/purchase')) return ['Billing workspace', 'Inventory', 'Purchase return'];
+  if (pathname.startsWith('/inventory/returns')) return ['Billing workspace', 'Inventory', 'Returns'];
+  if (pathname.startsWith('/inventory/grn')) return ['Billing workspace', 'Inventory', 'GRN'];
+  if (pathname.startsWith('/inventory/reports')) {
+    const leaf = pathname.split('/').pop()?.replace(/-/g, ' ') ?? 'Reports';
+    return ['Billing workspace', 'Inventory', 'Reports', leaf];
+  }
   if (pathname === '/profile') return ['Billing workspace', 'Profile'];
   if (pathname === '/settings') return ['Billing workspace', 'Settings'];
   if (pathname.startsWith('/settings/rbac')) {
@@ -121,7 +145,7 @@ export function AppLayout() {
           )}
         </Link>
       </div>
-      <nav className="flex-1 overflow-y-auto px-2 py-4 lg:px-3">
+      <nav className="overflow-y-auto flex-1 px-2 py-4 lg:px-3 max-h-[calc(92vh-120px)] ">
         {sections.map(({ title, items }) => (
           <div key={title} className="mb-6">
             {!sidebarCollapsed && (

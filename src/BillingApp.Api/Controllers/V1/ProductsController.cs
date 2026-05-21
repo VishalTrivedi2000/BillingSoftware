@@ -214,25 +214,13 @@ public sealed class ProductsController : ControllerBase
         if (stock < 0)
             stock = 0;
 
-        var body = new CreateProductRequest(
-            string.IsNullOrWhiteSpace(request.Sku) ? null : request.Sku.Trim(),
-            request.Name.Trim(),
-            string.IsNullOrWhiteSpace(request.Brand) ? null : request.Brand.Trim(),
-            request.UnitPrice,
-            request.CategoryId,
-            request.BrandId,
-            request.UnitId,
-            stock,
-            request.LowStockThreshold,
-            string.IsNullOrWhiteSpace(request.HsnCode) ? null : request.HsnCode.Trim(),
-            string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
-            request.Mrp,
-            request.PurchasePrice,
-            request.WholesalePrice,
-            request.MinWholesaleQty,
-            request.TaxRatePercent,
-            string.IsNullOrWhiteSpace(request.StorageLocation) ? null : request.StorageLocation.Trim(),
-            request.IsService);
+        var body = request with
+        {
+            Sku = string.IsNullOrWhiteSpace(request.Sku) ? null : request.Sku.Trim(),
+            Name = request.Name.Trim(),
+            Brand = string.IsNullOrWhiteSpace(request.Brand) ? null : request.Brand.Trim(),
+            StockQty = stock,
+        };
 
         try
         {
@@ -256,26 +244,13 @@ public sealed class ProductsController : ControllerBase
         if (stock < 0)
             stock = 0;
 
-        var body = new UpdateProductRequest(
-            string.IsNullOrWhiteSpace(request.Sku) ? null : request.Sku.Trim(),
-            request.Name.Trim(),
-            string.IsNullOrWhiteSpace(request.Brand) ? null : request.Brand.Trim(),
-            request.BrandId,
-            request.UnitId,
-            request.UnitPrice,
-            request.CategoryId,
-            stock,
-            request.LowStockThreshold,
-            request.IsActive,
-            string.IsNullOrWhiteSpace(request.HsnCode) ? null : request.HsnCode.Trim(),
-            string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
-            request.Mrp,
-            request.PurchasePrice,
-            request.WholesalePrice,
-            request.MinWholesaleQty,
-            request.TaxRatePercent,
-            string.IsNullOrWhiteSpace(request.StorageLocation) ? null : request.StorageLocation.Trim(),
-            request.IsService);
+        var body = request with
+        {
+            Sku = string.IsNullOrWhiteSpace(request.Sku) ? null : request.Sku.Trim(),
+            Name = request.Name.Trim(),
+            Brand = string.IsNullOrWhiteSpace(request.Brand) ? null : request.Brand.Trim(),
+            StockQty = stock,
+        };
 
         try
         {

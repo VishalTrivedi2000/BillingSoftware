@@ -90,7 +90,31 @@ public static class JwtAndAuthorizationInstaller
                     var u = ctx.User;
                     return HasPermission(u, PermissionNames.ProductsRead)
                            || HasPermission(u, PermissionNames.InvoicesRead)
-                           || HasPermission(u, PermissionNames.InvoicesCreate);
+                           || HasPermission(u, PermissionNames.InvoicesCreate)
+                           || HasPermission(u, PermissionNames.InventoryView);
+                });
+            });
+
+            // Inventory umbrella: any inventory-touching permission grants ledger/balance read.
+            options.AddPolicy(PolicyNames.BuiltIn.InventoryRead, policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireAssertion(ctx =>
+                {
+                    if (ctx.User.IsInRole(RoleNames.Admin))
+                        return true;
+
+                    static bool HasPermission(ClaimsPrincipal user, string permission) =>
+                        user.FindAll(BillingClaims.Permission).Any(c =>
+                            string.Equals(c.Value, permission, StringComparison.Ordinal));
+
+                    var u = ctx.User;
+                    return HasPermission(u, PermissionNames.InventoryView)
+                           || HasPermission(u, PermissionNames.InventoryAdjust)
+                           || HasPermission(u, PermissionNames.InventoryTransfer)
+                           || HasPermission(u, PermissionNames.InventoryReserve)
+                           || HasPermission(u, PermissionNames.InventoryReturn)
+                           || HasPermission(u, PermissionNames.ReportsInventory);
                 });
             });
         });

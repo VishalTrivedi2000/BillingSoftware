@@ -40,6 +40,21 @@ public static class PermissionNames
     public const string PartiesRead = "parties.read";
     public const string PartiesManage = "parties.manage";
 
+    /* ---------- Universal Product & Inventory Management (UPIM) ---------- */
+    public const string WarehousesRead = "warehouses.read";
+    public const string WarehousesManage = "warehouses.manage";
+
+    public const string VariantsManage = "variants.manage";
+
+    public const string InventoryView = "inventory.view";
+    public const string InventoryAdjust = "inventory.adjust";
+    public const string InventoryTransfer = "inventory.transfer";
+    public const string InventoryReserve = "inventory.reserve";
+    public const string InventoryReturn = "inventory.return";
+
+    public const string ReportsInventory = "reports.inventory";
+    public const string ReportsProfitability = "reports.profitability";
+
     public static IReadOnlyList<string> All { get; } =
     [
         SystemHealth,
@@ -66,5 +81,15 @@ public static class PermissionNames
         OrganizationsManage,
         PartiesRead,
         PartiesManage,
+        WarehousesRead,
+        WarehousesManage,
+        VariantsManage,
+        InventoryView,
+        InventoryAdjust,
+        InventoryTransfer,
+        InventoryReserve,
+        InventoryReturn,
+        ReportsInventory,
+        ReportsProfitability,
     ];
 }
