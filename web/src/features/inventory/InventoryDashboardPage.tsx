@@ -528,7 +528,7 @@ export function InventoryDashboardPage() {
   }, [ledgerQ.data?.items]);
 
   return (
-    <div className="stockpro-inv-dashboard -mx-4 -mt-4 min-h-full bg-[#f4f6fb] px-4 pb-12 pt-6 text-slate-900 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    <div className="stockpro-inv-dashboard app-page-canvas -mx-4 -mt-4 min-h-full px-4 pb-12 pt-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 lg:text-[1.65rem]">

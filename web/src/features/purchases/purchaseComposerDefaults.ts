@@ -4,6 +4,7 @@ export function newLine(): DraftLine {
   return {
     key: crypto.randomUUID(),
     productId: null,
+    productVariantId: null,
     description: '',
     quantity: 1,
     unitCost: 0,

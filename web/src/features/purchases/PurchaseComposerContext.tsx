@@ -48,6 +48,10 @@ function reviveDraft(raw: unknown): PurchaseComposerDraft | null {
   const lines = linesRaw.filter(isDraftLine).map((l) => ({
     key: l.key,
     productId: typeof l.productId === 'number' && Number.isFinite(l.productId) ? l.productId : null,
+    productVariantId:
+      typeof l.productVariantId === 'number' && Number.isFinite(l.productVariantId)
+        ? l.productVariantId
+        : null,
     description: l.description,
     quantity: typeof l.quantity === 'number' && Number.isFinite(l.quantity) ? l.quantity : 1,
     unitCost: typeof l.unitCost === 'number' && Number.isFinite(l.unitCost) ? l.unitCost : 0,

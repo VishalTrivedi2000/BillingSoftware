@@ -21,47 +21,33 @@ import type { InvoiceDraftLine } from './invoiceComposerTypes';
 import { mapInvoiceLineToDraft, newDraftLine } from './invoiceComposerDefaults';
 import { lineAmounts, lineEstCost } from './invoiceLineCalc';
 import { InvoiceSerialPickerModal } from './InvoiceSerialPickerModal';
-
-function normalizeProductSearch(q: string): string {
-  return q.trim().toLowerCase();
-}
-
-function productMatches(p: ProductDto, q: string): boolean {
-  if (!q) return false;
-  const n = p.name.toLowerCase();
-  const sku = (p.sku ?? '').toLowerCase();
-  const hsn = (p.hsnCode ?? '').toLowerCase();
-  const brand = (p.brand ?? '').toLowerCase();
-  const cat = (p.categoryName ?? '').toLowerCase();
-  return n.includes(q) || sku.includes(q) || hsn.includes(q) || brand.includes(q) || cat.includes(q);
-}
+import {
+  appAlertSuccess,
+  appBtnPrimary,
+  appBtnSecondary,
+  appFieldInput,
+  appFieldLabel,
+  appHeading,
+  appLinkAccent,
+  appPageCanvas,
+  appSurface,
+  appTextMuted,
+} from '../../shared/theme/contentThemeClasses';
+import { ProductCatalogSuggestPortal } from '../../shared/catalog/ProductCatalogSuggestPortal';
+import {
+  normalizeProductSearch,
+  saleLinePatchFromPick,
+  variantDisplayLabel,
+  type CatalogPickSuggestion,
+} from '../../shared/catalog/productCatalogPick';
+import { useCatalogPickSuggestions } from '../../shared/catalog/useCatalogPickSuggestions';
 
 function isSerializedProduct(p: ProductDto | undefined): boolean {
   const m = p?.inventoryTrackingMode;
   return m === InventoryTrackingModes.Serial || m === InventoryTrackingModes.BatchAndSerial;
 }
 
-function variantLabel(v: ProductVariantDto): string {
-  if (v.attributes?.length) {
-    return v.attributes.map((a) => a.value).join(' / ');
-  }
-  return v.displayName ?? v.sku ?? `Variant #${v.productVariantId}`;
-}
-
-const ITEM_PICKER_LIMIT = 500;
 const fmtInr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
-
-const inputClass =
-  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20';
-const labelClass = 'text-xs font-semibold text-slate-600';
-
-function sortedCatalog(products: ProductDto[]): ProductDto[] {
-  return [...products].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-}
-
-function formatProductLine(p: ProductDto): string {
-  return p.sku ? `${p.name} / ${p.sku}` : p.name;
-}
 
 function dueDaysLabel(orderDate: string, dueDate: string): string {
   try {
@@ -93,6 +79,7 @@ export function InvoiceCreatePage() {
   const [variantsByProduct, setVariantsByProduct] = useState<Record<number, ProductVariantDto[]>>({});
   const [serialPickerLineKey, setSerialPickerLineKey] = useState<string | null>(null);
   const linesShellRef = useRef<HTMLDivElement>(null);
+  const suggestAnchorRef = useRef<HTMLTableCellElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   useDismissSuggestionLayer(Boolean(suggestLineKey), linesShellRef, () => setSuggestLineKey(null));
 
@@ -239,6 +226,17 @@ export function InvoiceCreatePage() {
 
   const lines = draft?.lines ?? [];
 
+  const suggestLine = suggestLineKey ? lines.find((l) => l.key === suggestLineKey) : undefined;
+  const catalogSearchText = suggestLine
+    ? productPickDraft[suggestLine.key] ?? suggestLine.description
+    : '';
+  const catalogPickQ = useCatalogPickSuggestions(
+    catalogSearchText,
+    productsQ.data ?? [],
+    Boolean(suggestLineKey),
+    'sale',
+  );
+
   const totals = useMemo(() => {
     let subtotal = 0;
     let lineDiscount = 0;
@@ -325,7 +323,16 @@ export function InvoiceCreatePage() {
   function invoiceProductSeed(line: InvoiceDraftLine): string {
     if (line.productId != null) {
       const p = productsById.get(line.productId);
-      return p ? formatProductLine(p) : line.description;
+      if (p) {
+        const v =
+          line.productVariantId != null
+            ? variantsByProduct[line.productId]?.find((x) => x.productVariantId === line.productVariantId)
+            : undefined;
+        if (v && (variantsByProduct[line.productId]?.length ?? 0) > 1) {
+          return `${p.name} · ${variantDisplayLabel(v)}`;
+        }
+        return p.sku ? `${p.name} / ${p.sku}` : p.name;
+      }
     }
     return line.description;
   }
@@ -336,28 +343,19 @@ export function InvoiceCreatePage() {
     return invoiceProductSeed(line);
   }
 
-  function invoiceSuggestionsFor(line: InvoiceDraftLine): ProductDto[] {
-    const all = productsQ.data ?? [];
-    const sorted = sortedCatalog(all);
-    const raw = invoiceProductInputDisplay(line);
-    const q = normalizeProductSearch(raw);
-    if (!q) return sorted.slice(0, ITEM_PICKER_LIMIT);
-    return sorted.filter((p) => productMatches(p, q)).slice(0, ITEM_PICKER_LIMIT);
-  }
-
-  async function applyInvoiceProduct(lineKey: string, p: ProductDto) {
-    const variants = await ensureVariants(p.productId);
-    const defaultVar =
-      variants.find((v) => v.isDefault) ?? variants[0] ?? null;
-    setLine(lineKey, {
-      productId: p.productId,
-      productVariantId: defaultVar?.productVariantId ?? null,
-      description: p.name,
-      unitPrice: defaultVar?.salePrice ?? p.unitPrice,
-      taxRatePercent: p.taxRatePercent ?? 0,
-      selectedSerials: [],
-      quantity: 1,
-    });
+  async function applyCatalogPick(lineKey: string, pick: CatalogPickSuggestion) {
+    let variant = pick.variant;
+    if (!variant) {
+      const variants = await ensureVariants(pick.product.productId);
+      variant = variants.find((v) => v.isDefault) ?? variants[0] ?? null;
+    } else {
+      setVariantsByProduct((prev) => {
+        const existing = prev[pick.product.productId] ?? [];
+        if (existing.some((x) => x.productVariantId === variant!.productVariantId)) return prev;
+        return { ...prev, [pick.product.productId]: [...existing, variant!] };
+      });
+    }
+    setLine(lineKey, saleLinePatchFromPick(pick, variant));
     setProductPickDraft((prev) => {
       const next = { ...prev };
       delete next[lineKey];
@@ -455,7 +453,7 @@ export function InvoiceCreatePage() {
   const dueHint = dueDaysLabel(draft.orderDate, draft.dueDate);
 
   return (
-    <div className="-mx-4 -mt-4 min-h-full bg-[#f4f6fb] px-4 pb-16 pt-4 text-slate-900 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    <div className={appPageCanvas}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-medium text-slate-500">
@@ -465,15 +463,15 @@ export function InvoiceCreatePage() {
             <span className="mx-1">›</span>
             Create Invoice
           </p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">Create Sales Invoice</h1>
-          <p className="mt-1 max-w-xl text-sm text-slate-600">
+          <h1 className={`mt-1 ${appHeading}`}>Create Sales Invoice</h1>
+          <p className={`mt-1 max-w-xl ${appTextMuted}`}>
             Add products, select customer, and assign IMEI / serial numbers for serialized items.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
             to="/invoices"
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className={appBtnSecondary}
           >
             Cancel
           </Link>
@@ -489,7 +487,7 @@ export function InvoiceCreatePage() {
             type="button"
             onClick={() => formRef.current?.requestSubmit()}
             disabled={createMut.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-60"
+            className={appBtnPrimary}
           >
             {createMut.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -502,7 +500,7 @@ export function InvoiceCreatePage() {
       </div>
 
       {draftBanner && (
-        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+        <div className={`mb-4 ${appAlertSuccess}`}>
           {draftBanner}
         </div>
       )}
@@ -510,11 +508,11 @@ export function InvoiceCreatePage() {
       <form ref={formRef} onSubmit={(e) => void onSubmit(e)} className="space-y-4">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <div className="space-y-4 xl:col-span-8">
-            <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
-              <h2 className="mb-4 text-sm font-bold text-slate-800">Invoice details</h2>
+            <section className={appSurface}>
+              <h2 className="app-section-title mb-4">Invoice details</h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <label className="sm:col-span-2">
-                  <span className={labelClass}>Customer *</span>
+                  <span className={appFieldLabel}>Customer *</span>
                   <select
                     required
                     value={draft.customerId === '' ? '' : String(draft.customerId)}
@@ -522,7 +520,7 @@ export function InvoiceCreatePage() {
                       const v = e.target.value === '' ? '' : Number(e.target.value);
                       patchDraft(tabId, (d) => ({ ...d, customerId: v }));
                     }}
-                    className={`${inputClass} mt-1`}
+                    className={`${appFieldInput} mt-1`}
                   >
                     <option value="">Select customer…</option>
                     {(customersQ.data ?? []).map((c) => (
@@ -531,16 +529,16 @@ export function InvoiceCreatePage() {
                       </option>
                     ))}
                   </select>
-                  <Link to="/customers" className="mt-1 inline-block text-xs font-semibold text-blue-600 hover:underline">
+                  <Link to="/customers" className={`mt-1 inline-block ${appLinkAccent} hover:underline`}>
                     + New Customer
                   </Link>
                 </label>
                 <label>
-                  <span className={labelClass}>Sales Channel</span>
+                  <span className={appFieldLabel}>Sales Channel</span>
                   <select
                     value={draft.salesChannel}
                     onChange={(e) => patchDraft(tabId, (d) => ({ ...d, salesChannel: e.target.value }))}
-                    className={`${inputClass} mt-1`}
+                    className={`${appFieldInput} mt-1`}
                   >
                     <option>Retail Store</option>
                     <option>Online</option>
@@ -548,44 +546,44 @@ export function InvoiceCreatePage() {
                   </select>
                 </label>
                 <label>
-                  <span className={labelClass}>Email</span>
+                  <span className={appFieldLabel}>Email</span>
                   <input
                     readOnly
                     value={customer?.email ?? ''}
-                    className={`${inputClass} mt-1 bg-slate-50`}
+                    className={`${appFieldInput} mt-1 bg-slate-50`}
                     placeholder="—"
                   />
                 </label>
                 <label>
-                  <span className={labelClass}>Phone</span>
+                  <span className={appFieldLabel}>Phone</span>
                   <input
                     readOnly
                     value={customer?.phone ?? ''}
-                    className={`${inputClass} mt-1 bg-slate-50`}
+                    className={`${appFieldInput} mt-1 bg-slate-50`}
                     placeholder="—"
                   />
                 </label>
                 <label>
-                  <span className={labelClass}>GSTIN (optional)</span>
+                  <span className={appFieldLabel}>GSTIN (optional)</span>
                   <input
                     value={draft.gstin || customer?.taxId || ''}
                     onChange={(e) => patchDraft(tabId, (d) => ({ ...d, gstin: e.target.value }))}
-                    className={`${inputClass} mt-1`}
+                    className={`${appFieldInput} mt-1`}
                     placeholder="GST number"
                   />
                 </label>
                 <label className="sm:col-span-2 lg:col-span-3">
-                  <span className={labelClass}>Billing Address</span>
+                  <span className={appFieldLabel}>Billing Address</span>
                   <textarea
                     value={draft.billingAddress}
                     onChange={(e) => patchDraft(tabId, (d) => ({ ...d, billingAddress: e.target.value }))}
                     rows={2}
-                    className={`${inputClass} mt-1`}
+                    className={`${appFieldInput} mt-1`}
                     placeholder="Street, city, state, PIN"
                   />
                 </label>
                 <label>
-                  <span className={labelClass}>Warehouse</span>
+                  <span className={appFieldLabel}>Warehouse</span>
                   <select
                     value={draft.warehouseId === '' ? '' : String(draft.warehouseId)}
                     onChange={(e) =>
@@ -594,7 +592,7 @@ export function InvoiceCreatePage() {
                         warehouseId: e.target.value === '' ? '' : Number(e.target.value),
                       }))
                     }
-                    className={`${inputClass} mt-1`}
+                    className={`${appFieldInput} mt-1`}
                   >
                     <option value="">Select warehouse…</option>
                     {(warehousesQ.data ?? []).map((w: WarehouseDto) => (
@@ -605,31 +603,31 @@ export function InvoiceCreatePage() {
                   </select>
                 </label>
                 <label>
-                  <span className={labelClass}>Order Date</span>
+                  <span className={appFieldLabel}>Order Date</span>
                   <input
                     type="date"
                     value={draft.orderDate}
                     onChange={(e) => patchDraft(tabId, (d) => ({ ...d, orderDate: e.target.value }))}
-                    className={`${inputClass} mt-1`}
+                    className={`${appFieldInput} mt-1`}
                   />
                 </label>
                 <label>
-                  <span className={labelClass}>
+                  <span className={appFieldLabel}>
                     Due Date {dueHint && <span className="font-normal text-blue-600">{dueHint}</span>}
                   </span>
                   <input
                     type="date"
                     value={draft.dueDate}
                     onChange={(e) => patchDraft(tabId, (d) => ({ ...d, dueDate: e.target.value }))}
-                    className={`${inputClass} mt-1`}
+                    className={`${appFieldInput} mt-1`}
                   />
                 </label>
                 <label>
-                  <span className={labelClass}>Payment Method</span>
+                  <span className={appFieldLabel}>Payment Method</span>
                   <select
                     value={draft.paymentMethod}
                     onChange={(e) => patchDraft(tabId, (d) => ({ ...d, paymentMethod: e.target.value }))}
-                    className={`${inputClass} mt-1`}
+                    className={`${appFieldInput} mt-1`}
                   >
                     <option>Credit Card</option>
                     <option>UPI</option>
@@ -639,20 +637,20 @@ export function InvoiceCreatePage() {
                   </select>
                 </label>
                 <label>
-                  <span className={labelClass}>Reference (optional)</span>
+                  <span className={appFieldLabel}>Reference (optional)</span>
                   <input
                     value={draft.reference}
                     onChange={(e) => patchDraft(tabId, (d) => ({ ...d, reference: e.target.value }))}
-                    className={`${inputClass} mt-1`}
+                    className={`${appFieldInput} mt-1`}
                     placeholder="PO / order ref"
                   />
                 </label>
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
+            <section className="app-surface">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-sm font-bold text-slate-800">Line Items</h2>
+                <h2 className="app-section-title text-sm font-bold">Line Items</h2>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -672,7 +670,8 @@ export function InvoiceCreatePage() {
                 </div>
               </div>
 
-              <div ref={linesShellRef} className="overflow-x-auto rounded-xl border border-slate-200">
+              <div ref={linesShellRef}>
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
                 <table className="min-w-[960px] w-full text-left text-sm">
                   <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                     <tr>
@@ -694,55 +693,62 @@ export function InvoiceCreatePage() {
                       const serialized = isSerializedProduct(p);
                       const variants = line.productId != null ? variantsByProduct[line.productId] : undefined;
                       const amounts = lineAmounts(line);
-                      const sug = invoiceSuggestionsFor(line);
                       const filterActive = normalizeProductSearch(invoiceProductInputDisplay(line)).length > 0;
+                      const lineSuggestions =
+                        suggestLineKey === line.key ? catalogPickQ.suggestions : [];
                       const showSuggest =
                         suggestLineKey === line.key &&
-                        (productsQ.isLoading || canManageProducts || sug.length > 0 || (filterActive && !productsQ.isLoading));
+                        (productsQ.isLoading ||
+                          catalogPickQ.variantsLoading ||
+                          canManageProducts ||
+                          lineSuggestions.length > 0 ||
+                          (filterActive && !productsQ.isLoading));
 
                       return (
                         <Fragment key={line.key}>
                           <tr className="border-b border-slate-100 align-top">
                             <td className="px-2 py-2 text-center text-xs text-slate-500">{idx + 1}</td>
-                            <td className="relative px-2 py-2">
-                              <input
-                                value={invoiceProductInputDisplay(line)}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  setProductPickDraft((prev) => ({ ...prev, [line.key]: v }));
-                                  setLine(line.key, {
-                                    productId: null,
-                                    productVariantId: null,
-                                    description: v,
-                                    selectedSerials: [],
-                                  });
-                                  setSuggestLineKey(line.key);
+                            <td
+                              ref={suggestLineKey === line.key ? suggestAnchorRef : undefined}
+                              className="relative px-2 py-2"
+                            >
+                              <ProductCatalogSuggestPortal
+                                open={showSuggest && !productsQ.isLoading}
+                                anchorRef={suggestAnchorRef}
+                                theme="light"
+                                suggestions={lineSuggestions}
+                                loading={catalogPickQ.variantsLoading || productsQ.isLoading}
+                                filterActive={filterActive}
+                                canManageProducts={canManageProducts}
+                                onPick={(pick) => void applyCatalogPick(line.key, pick)}
+                                onCreateNew={() => {
+                                  setQuickProductLineKey(line.key);
+                                  setQuickProductOpen(true);
+                                  setSuggestLineKey(null);
                                 }}
-                                onFocus={() => {
-                                  setSuggestLineKey(line.key);
-                                  if (line.productId != null) void ensureVariants(line.productId);
-                                }}
-                                className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs"
-                                placeholder="Search product…"
-                                autoComplete="off"
-                              />
-                              {showSuggest && (
-                                <ul className="absolute left-2 top-full z-[80] max-h-48 min-w-[240px] overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                                  {sug.map((sp) => (
-                                    <li key={sp.productId}>
-                                      <button
-                                        type="button"
-                                        className="w-full px-3 py-2 text-left text-xs hover:bg-slate-50"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => void applyInvoiceProduct(line.key, sp)}
-                                      >
-                                        <span className="font-semibold">{sp.name}</span>
-                                        {sp.sku && <span className="text-slate-500"> · {sp.sku}</span>}
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
+                              >
+                                <input
+                                  value={invoiceProductInputDisplay(line)}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    setProductPickDraft((prev) => ({ ...prev, [line.key]: v }));
+                                    setLine(line.key, {
+                                      productId: null,
+                                      productVariantId: null,
+                                      description: v,
+                                      selectedSerials: [],
+                                    });
+                                    setSuggestLineKey(line.key);
+                                  }}
+                                  onFocus={() => {
+                                    setSuggestLineKey(line.key);
+                                    if (line.productId != null) void ensureVariants(line.productId);
+                                  }}
+                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs"
+                                  placeholder="Search product or variant…"
+                                  autoComplete="off"
+                                />
+                              </ProductCatalogSuggestPortal>
                             </td>
                             <td className="px-2 py-2">
                               {variants && variants.length > 1 ? (
@@ -762,13 +768,13 @@ export function InvoiceCreatePage() {
                                   <option value="">Variant…</option>
                                   {variants.map((v) => (
                                     <option key={v.productVariantId} value={v.productVariantId}>
-                                      {variantLabel(v)}
+                                      {variantDisplayLabel(v)}
                                     </option>
                                   ))}
                                 </select>
                               ) : (
                                 <span className="text-xs text-slate-500">
-                                  {variants?.[0] ? variantLabel(variants[0]) : '—'}
+                                  {variants?.[0] ? variantDisplayLabel(variants[0]) : '—'}
                                 </span>
                               )}
                             </td>
@@ -915,14 +921,15 @@ export function InvoiceCreatePage() {
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
             </section>
           </div>
 
           <div className="space-y-4 xl:col-span-4">
-            <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
+            <section className="app-surface">
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-sm font-bold text-slate-800">Delivery Details</h2>
+                <h2 className="app-section-title text-sm font-bold">Delivery Details</h2>
                 <label className="flex items-center gap-2 text-xs text-slate-600">
                   <input
                     type="checkbox"
@@ -943,7 +950,7 @@ export function InvoiceCreatePage() {
                       patchDraft(tabId, (d) => ({ ...d, deliveryRecipient: e.target.value }))
                     }
                     placeholder="Recipient"
-                    className={inputClass}
+                    className={appFieldInput}
                   />
                   <textarea
                     value={draft.deliveryAddress}
@@ -952,14 +959,14 @@ export function InvoiceCreatePage() {
                     }
                     placeholder="Shipping address"
                     rows={2}
-                    className={inputClass}
+                    className={appFieldInput}
                   />
                 </div>
               )}
             </section>
 
-            <section className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm">
-              <h2 className="mb-4 text-sm font-bold text-slate-800">Invoice Summary</h2>
+            <section className="app-surface">
+              <h2 className="mb-4 app-section-title text-sm font-bold">Invoice Summary</h2>
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <dt className="text-slate-500">Subtotal</dt>
@@ -1076,7 +1083,16 @@ export function InvoiceCreatePage() {
         }}
         lineKey={quickProductLineKey}
         onCreated={(product, lk) => {
-          if (lk != null) void applyInvoiceProduct(lk, product);
+          if (lk != null) {
+            void applyCatalogPick(lk, {
+              key: `p-${product.productId}`,
+              product,
+              variant: null,
+              title: product.name,
+              detail: product.sku ?? '',
+              isMainProduct: true,
+            });
+          }
           void qc.invalidateQueries({ queryKey: ['products-pick', workplaceOrgId] });
         }}
       />

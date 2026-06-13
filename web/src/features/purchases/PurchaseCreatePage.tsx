@@ -28,25 +28,15 @@ import { PURCHASE_TEMPLATES, buildDraftLinesFromTemplate } from './purchaseTempl
 import { useDismissSuggestionLayer } from '../../shared/hooks/useDismissSuggestionLayer';
 import { blockComposerSubmitShortcut } from '../../shared/composer/composerShortcuts';
 
-function normalizeProductSearch(q: string): string {
-  return q.trim().toLowerCase();
-}
-
-function productMatches(p: ProductDto, q: string): boolean {
-  if (!q) return false;
-  const n = p.name.toLowerCase();
-  const sku = (p.sku ?? '').toLowerCase();
-  const hsn = (p.hsnCode ?? '').toLowerCase();
-  const brand = (p.brand ?? '').toLowerCase();
-  const cat = (p.categoryName ?? '').toLowerCase();
-  return n.includes(q) || sku.includes(q) || hsn.includes(q) || brand.includes(q) || cat.includes(q);
-}
-
-const ITEM_PICKER_LIMIT = 500;
-
-function sortedCatalog(products: ProductDto[]): ProductDto[] {
-  return [...products].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-}
+import { productApi } from '../products/productApi';
+import { ProductCatalogSuggestPortal } from '../../shared/catalog/ProductCatalogSuggestPortal';
+import {
+  normalizeProductSearch,
+  purchaseLinePatchFromPick,
+  type CatalogPickSuggestion,
+} from '../../shared/catalog/productCatalogPick';
+import { useCatalogPickSuggestions } from '../../shared/catalog/useCatalogPickSuggestions';
+import type { ProductVariantDto } from '../../entities/inventory';
 
 function linesToDraftApi(lines: DraftLine[]): CreatePurchaseBillBody['lines'] {
   return lines
@@ -85,6 +75,7 @@ function mapDetailLineToDraft(line: PurchaseLineDto): DraftLine {
   return {
     key: crypto.randomUUID(),
     productId: line.productId,
+    productVariantId: null,
     description: line.description,
     quantity: line.quantity,
     unitCost: line.unitCost,
@@ -129,6 +120,8 @@ export function PurchaseCreatePage() {
   const [quickProductOpen, setQuickProductOpen] = useState(false);
   const [quickProductLineKey, setQuickProductLineKey] = useState<string | null>(null);
   const [suggestLineKey, setSuggestLineKey] = useState<string | null>(null);
+  const [productPickDraft, setProductPickDraft] = useState<Record<string, string>>({});
+  const [variantsByProduct, setVariantsByProduct] = useState<Record<number, ProductVariantDto[]>>({});
   const [templateSelectKey, setTemplateSelectKey] = useState('');
 
   const composerDraft = isComposer && tabId ? composer!.drafts[tabId] : undefined;
@@ -137,10 +130,12 @@ export function PurchaseCreatePage() {
   const serverDraftId = isComposer ? (composerDraft?.serverDraftId ?? null) : standaloneUrlDraftId;
 
   const linesGridShellRef = useRef<HTMLDivElement>(null);
+  const suggestAnchorRef = useRef<HTMLDivElement>(null);
   useDismissSuggestionLayer(Boolean(suggestLineKey), linesGridShellRef, () => setSuggestLineKey(null));
 
   useEffect(() => {
     setSuggestLineKey(null);
+    setProductPickDraft({});
   }, [tabId]);
 
   function setPartyIdNext(v: number | '') {
@@ -217,6 +212,17 @@ export function PurchaseCreatePage() {
     for (const p of productsQ.data ?? []) m.set(p.productId, p);
     return m;
   }, [productsQ.data]);
+
+  const suggestLine = suggestLineKey ? lines.find((l) => l.key === suggestLineKey) : undefined;
+  const catalogSearchText = suggestLine
+    ? productPickDraft[suggestLine.key] ?? suggestLine.description
+    : '';
+  const catalogPickQ = useCatalogPickSuggestions(
+    catalogSearchText,
+    productsQ.data ?? [],
+    Boolean(suggestLineKey),
+    'purchase',
+  );
 
   const linePreviews = useMemo(() => {
     const m = new Map<string, ReturnType<typeof computePurchaseLinePreview>>();
@@ -479,22 +485,38 @@ export function PurchaseCreatePage() {
     updateLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
-  function applyProduct(lineKey: string, p: ProductDto) {
-    setLine(lineKey, {
-      productId: p.productId,
-      description: p.name,
-      unitCost: defaultPurchaseUnitCost(p),
-      taxRatePercent: p.taxRatePercent != null && Number.isFinite(p.taxRatePercent) ? p.taxRatePercent : 0,
-    });
-    setSuggestLineKey(null);
+  async function ensureVariants(productId: number): Promise<ProductVariantDto[]> {
+    if (variantsByProduct[productId]) return variantsByProduct[productId]!;
+    const list = await productApi.listVariants(productId);
+    setVariantsByProduct((prev) => ({ ...prev, [productId]: list }));
+    return list;
   }
 
-  function suggestionsFor(line: DraftLine): ProductDto[] {
-    const all = productsQ.data ?? [];
-    const sorted = sortedCatalog(all);
-    const q = normalizeProductSearch(line.description);
-    if (!q) return sorted.slice(0, ITEM_PICKER_LIMIT);
-    return sorted.filter((p) => productMatches(p, q)).slice(0, ITEM_PICKER_LIMIT);
+  function purchaseLineInputDisplay(line: DraftLine): string {
+    const d = productPickDraft[line.key];
+    if (d !== undefined) return d;
+    return line.description;
+  }
+
+  async function applyCatalogPick(lineKey: string, pick: CatalogPickSuggestion) {
+    let variant = pick.variant;
+    if (!variant) {
+      const variants = await ensureVariants(pick.product.productId);
+      variant = variants.find((v) => v.isDefault) ?? variants[0] ?? null;
+    } else {
+      setVariantsByProduct((prev) => {
+        const existing = prev[pick.product.productId] ?? [];
+        if (existing.some((x) => x.productVariantId === variant!.productVariantId)) return prev;
+        return { ...prev, [pick.product.productId]: [...existing, variant!] };
+      });
+    }
+    setLine(lineKey, purchaseLinePatchFromPick(pick, variant, defaultPurchaseUnitCost));
+    setProductPickDraft((prev) => {
+      const next = { ...prev };
+      delete next[lineKey];
+      return next;
+    });
+    setSuggestLineKey(null);
   }
 
   async function onManualSaveDraft() {
@@ -656,7 +678,8 @@ export function PurchaseCreatePage() {
           </button>
         </div>
 
-        <div ref={linesGridShellRef} className="overflow-x-auto rounded-xl border border-white/10">
+        <div ref={linesGridShellRef}>
+          <div className="overflow-x-auto rounded-xl border border-white/10">
           <div className="min-w-[1040px]">
             <div
               className={`${purchaseLineGrid} border-b border-white/10 bg-white/[0.04] text-[10px] font-semibold uppercase tracking-wide text-slate-500`}
@@ -679,12 +702,17 @@ export function PurchaseCreatePage() {
             {lines.map((line, idx) => {
               const p = line.productId != null ? productsById.get(line.productId) : undefined;
               const preview = linePreviews.get(line.key)!;
-              const sug = suggestionsFor(line);
-              const filterActive = normalizeProductSearch(line.description).length > 0;
+              const filterActive = normalizeProductSearch(purchaseLineInputDisplay(line)).length > 0;
               const showSuggest =
                 suggestLineKey === line.key &&
-                (productsQ.isLoading || canManageProducts || sug.length > 0 || (filterActive && !productsQ.isLoading));
+                (productsQ.isLoading ||
+                  catalogPickQ.variantsLoading ||
+                  canManageProducts ||
+                  catalogPickQ.suggestions.length > 0 ||
+                  (filterActive && !productsQ.isLoading));
               const rowLift = suggestLineKey === line.key;
+              const lineSuggestions =
+                suggestLineKey === line.key ? catalogPickQ.suggestions : [];
 
               return (
                 <div
@@ -692,69 +720,47 @@ export function PurchaseCreatePage() {
                   className={`${purchaseLineGrid} relative border-b border-white/[0.06] last:border-b-0 hover:bg-white/[0.02] ${rowLift ? 'z-[75]' : 'z-[1]'}`}
                 >
                   <div className="text-center text-xs tabular-nums text-slate-500">{idx + 1}</div>
-                  <div className="relative min-w-0">
-                    <input
-                      value={line.description}
-                      onChange={(e) => {
-                        setLine(line.key, { description: e.target.value, productId: null });
-                        setSuggestLineKey(line.key);
+                  <div
+                    ref={suggestLineKey === line.key ? suggestAnchorRef : undefined}
+                    className="relative min-w-0"
+                  >
+                    <ProductCatalogSuggestPortal
+                      open={showSuggest && !productsQ.isLoading}
+                      anchorRef={suggestAnchorRef}
+                      theme="dark"
+                      suggestions={lineSuggestions}
+                      loading={catalogPickQ.variantsLoading || productsQ.isLoading}
+                      filterActive={filterActive}
+                      canManageProducts={canManageProducts}
+                      onPick={(pick) => void applyCatalogPick(line.key, pick)}
+                      onCreateNew={() => {
+                        setQuickProductLineKey(line.key);
+                        setQuickProductOpen(true);
+                        setSuggestLineKey(null);
                       }}
-                      onFocus={() => setSuggestLineKey(line.key)}
-                      className={cellInput}
-                      placeholder="Search catalog…"
-                      autoComplete="off"
-                      aria-label={`Line ${idx + 1} item`}
-                    />
-                    {showSuggest && (
-                      <ul className="absolute left-0 top-[calc(100%+4px)] z-[320] max-h-60 min-w-[260px] max-w-[min(100vw-2rem,440px)] overflow-auto rounded-lg border border-white/15 bg-[#151b28] py-1 shadow-2xl ring-1 ring-black/40">
-                        {productsQ.isLoading && <li className="px-3 py-2 text-xs text-slate-500">Loading catalog…</li>}
-                        {!productsQ.isLoading && sug.length > 0 && !normalizeProductSearch(line.description) && (
-                          <li className="pointer-events-none px-3 py-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-600">
-                            All items · type to narrow
-                          </li>
-                        )}
-                        {filterActive && !productsQ.isLoading && sug.length === 0 && (
-                          <li className="pointer-events-none px-3 py-2 text-xs text-slate-500">
-                            No catalog matches — try another spelling or create new.
-                          </li>
-                        )}
-                        {sug.map((sp) => (
-                          <li key={sp.productId}>
-                            <button
-                              type="button"
-                              className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-white/10"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => applyProduct(line.key, sp)}
-                            >
-                              <span className="text-sm text-slate-100">{sp.name}</span>
-                              <span className="text-[10px] text-slate-500">
-                                {sp.brand ? `${sp.brand} · ` : ''}
-                                {sp.sku ? `${sp.sku} · ` : ''}
-                                Sale {fmtInrPreview.format(sp.unitPrice)}
-                                {sp.purchasePrice != null ? ` · Cost ${fmtInrPreview.format(sp.purchasePrice)}` : ''}
-                                {sp.stockQty != null ? ` · Stock ${sp.stockQty}` : ''}
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                        {canManageProducts && (
-                          <li className="border-t border-white/10">
-                            <button
-                              type="button"
-                              className="flex w-full px-3 py-2 text-left text-xs font-semibold text-emerald-400 hover:bg-white/10"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                setQuickProductLineKey(line.key);
-                                setQuickProductOpen(true);
-                                setSuggestLineKey(null);
-                              }}
-                            >
-                              + Create new catalog item…
-                            </button>
-                          </li>
-                        )}
-                      </ul>
-                    )}
+                    >
+                      <input
+                        value={purchaseLineInputDisplay(line)}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setProductPickDraft((prev) => ({ ...prev, [line.key]: v }));
+                          setLine(line.key, {
+                            description: v,
+                            productId: null,
+                            productVariantId: null,
+                          });
+                          setSuggestLineKey(line.key);
+                        }}
+                        onFocus={() => {
+                          setSuggestLineKey(line.key);
+                          if (line.productId != null) void ensureVariants(line.productId);
+                        }}
+                        className={cellInput}
+                        placeholder="Search product or variant…"
+                        autoComplete="off"
+                        aria-label={`Line ${idx + 1} item`}
+                      />
+                    </ProductCatalogSuggestPortal>
                   </div>
                   <div>
                     <input
@@ -861,6 +867,7 @@ export function PurchaseCreatePage() {
               );
             })}
           </div>
+          </div>
         </div>
 
         <div className="flex flex-wrap justify-end gap-6 border-t border-white/10 pt-4">
@@ -923,6 +930,7 @@ export function PurchaseCreatePage() {
                   ? {
                       ...line,
                       productId: product.productId,
+                      productVariantId: null,
                       description: product.name,
                       unitCost: defaultPurchaseUnitCost(product),
                       taxRatePercent:

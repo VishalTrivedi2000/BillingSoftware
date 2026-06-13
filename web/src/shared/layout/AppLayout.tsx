@@ -14,6 +14,7 @@ import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { toggleSidebar } from '../../features/layout/uiSlice';
 import { CommandPalette } from './CommandPalette';
 import { navSections } from './navConfig';
+import { ThemeToggle } from '../theme/ThemeToggle';
 import { UserMenu } from './UserMenu';
 import { WorkplaceBadge } from './WorkplaceBadge';
 import { WorkspaceOutlet } from './WorkspaceOutlet';
@@ -332,6 +333,7 @@ export function AppLayout() {
                 <Bell className="h-5 w-5" aria-hidden />
               </button>
 
+              <ThemeToggle />
               <WorkplaceBadge />
               <UserMenu />
             </div>
@@ -342,7 +344,9 @@ export function AppLayout() {
               compactWorkspaceRail ? 'px-2 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6' : 'px-4 py-6 lg:px-8 lg:py-8'
             }`}
           >
-            <WorkspaceOutlet />
+            <div className="app-workspace-content min-h-0 min-w-0 flex-1">
+              <WorkspaceOutlet />
+            </div>
           </main>
         </div>
       </div>
