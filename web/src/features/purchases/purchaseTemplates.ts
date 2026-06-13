@@ -6,6 +6,7 @@
 export type PurchaseComposerDraftLine = {
   key: string;
   productId: number | null;
+  productVariantId: number | null;
   description: string;
   quantity: number;
   unitCost: number;
@@ -28,6 +29,7 @@ function blankRow(overrides: Partial<Omit<PurchaseComposerDraftLine, 'key'>>): P
   return {
     key: crypto.randomUUID(),
     productId: null,
+    productVariantId: null,
     description: '',
     quantity: 1,
     unitCost: 0,

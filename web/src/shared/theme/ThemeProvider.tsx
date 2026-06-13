@@ -1,27 +1,35 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   APP_THEME_STORAGE_KEY,
-  type AppThemeId,
-  normalizeAppThemeId,
-  readStoredAppThemeId,
-} from './appThemes';
+  applyCatalogTheme,
+  CATALOG_THEME_METAS,
+  getCatalogTheme,
+  normalizeCatalogThemeId,
+  readStoredCatalogThemeId,
+  type CatalogTheme,
+} from './catalogTheme';
 
-type ThemeCtx = {
-  themeId: AppThemeId;
-  setThemeId: (id: AppThemeId) => void;
+export type ThemeCtx = {
+  themeId: string;
+  theme: CatalogTheme;
+  themes: readonly CatalogTheme[];
+  setThemeId: (id: string) => void;
 };
 
 const ThemeContext = createContext<ThemeCtx | null>(null);
 
-function applyDomTheme(id: AppThemeId) {
-  document.documentElement.dataset.appTheme = id;
+function applyThemeById(id: string) {
+  const theme = getCatalogTheme(id);
+  if (theme) applyCatalogTheme(theme, id);
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeId, setThemeState] = useState<AppThemeId>(() => readStoredAppThemeId());
+  const [themeId, setThemeState] = useState<string>(() => readStoredCatalogThemeId());
+
+  const theme = useMemo(() => getCatalogTheme(themeId) ?? CATALOG_THEME_METAS[0]!.theme, [themeId]);
 
   useEffect(() => {
-    applyDomTheme(themeId);
+    applyThemeById(themeId);
     try {
       localStorage.setItem(APP_THEME_STORAGE_KEY, themeId);
     } catch {
@@ -32,18 +40,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     function onStorage(e: StorageEvent) {
       if (e.key === APP_THEME_STORAGE_KEY && e.newValue != null) {
-        setThemeState(normalizeAppThemeId(e.newValue));
+        setThemeState(normalizeCatalogThemeId(e.newValue));
       }
     }
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const setThemeId = useCallback((id: AppThemeId) => {
-    setThemeState(normalizeAppThemeId(id));
+  const setThemeId = useCallback((id: string) => {
+    setThemeState(normalizeCatalogThemeId(id));
   }, []);
 
-  const value = useMemo(() => ({ themeId, setThemeId }), [themeId, setThemeId]);
+  const value = useMemo(
+    () => ({
+      themeId,
+      theme,
+      themes: CATALOG_THEME_METAS.map((m) => m.theme),
+      setThemeId,
+    }),
+    [themeId, theme, setThemeId],
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

@@ -206,8 +206,7 @@ public sealed class InventoryLedgerRepository : IInventoryRepository
               SELECT t.InventoryTransactionId, t.ProductVariantId, COALESCE(v.DisplayName, p.Name) AS VariantDisplay, v.Sku,
                      t.WarehouseId, w.Name AS WarehouseName, t.BatchId, b.BatchNumber, t.ProductSerialId, s.SerialNumber,
                      t.TransactionType, t.QuantityBucket, t.QtyChange, t.CostPerUnit,
-                     t.SourceDocumentType, t.SourceDocumentId, t.SourceLineId, t.ReversalOfTransactionId, t.Reason, t.CreatedBy, t.CreatedUtc,
-                     p.ProductId
+                     t.SourceDocumentType, t.SourceDocumentId, t.SourceLineId, t.ReversalOfTransactionId, t.Reason, t.CreatedBy, t.CreatedUtc
               FROM dbo.InventoryTransactions t
               INNER JOIN dbo.ProductVariants v ON v.ProductVariantId = t.ProductVariantId
               INNER JOIN dbo.Products p ON p.ProductId = v.ProductId
@@ -270,7 +269,8 @@ public sealed class InventoryLedgerRepository : IInventoryRepository
             Take = Math.Clamp(query.Take, 1, 200),
         }, cancellationToken: ct)).ConfigureAwait(false);
 
-        var rows = (await grid.ReadAsync<InventoryTransactionDto>().ConfigureAwait(false)).AsList();
+        var rowModels = (await grid.ReadAsync<LedgerTransactionRow>().ConfigureAwait(false)).AsList();
+        var rows = rowModels.ConvertAll(ToTransactionDto);
         var total = await grid.ReadSingleAsync<int>().ConfigureAwait(false);
         return new InventoryLedgerResult(rows, total);
     }
@@ -292,12 +292,13 @@ public sealed class InventoryLedgerRepository : IInventoryRepository
               AND t.TenantId = @TenantId AND t.OrganizationId = @OrganizationId;
             """;
         await using var conn = await _db.CreateOpenConnectionAsync(ct).ConfigureAwait(false);
-        return await conn.QuerySingleOrDefaultAsync<InventoryTransactionDto>(new CommandDefinition(sql, new
+        var row = await conn.QuerySingleOrDefaultAsync<LedgerTransactionRow>(new CommandDefinition(sql, new
         {
             Id = inventoryTransactionId,
             TenantId = _wp.TenantId,
             OrganizationId = _wp.OrganizationId,
         }, cancellationToken: ct)).ConfigureAwait(false);
+        return row is null ? null : ToTransactionDto(row);
     }
 
     public async Task<InventoryBalanceResult> BalancesAsync(InventoryBalanceQuery query, CancellationToken ct)
@@ -642,6 +643,56 @@ public sealed class InventoryLedgerRepository : IInventoryRepository
     }
 
     /* --------------------------- helpers --------------------------- */
+
+    /// <summary>Dapper row shape for ledger queries (class avoids record/ctor mapping edge cases).</summary>
+    private sealed class LedgerTransactionRow
+    {
+        public long InventoryTransactionId { get; init; }
+        public long ProductVariantId { get; init; }
+        public string VariantDisplay { get; init; } = "";
+        public string? Sku { get; init; }
+        public long WarehouseId { get; init; }
+        public string WarehouseName { get; init; } = "";
+        public long? BatchId { get; init; }
+        public string? BatchNumber { get; init; }
+        public long? ProductSerialId { get; init; }
+        public string? SerialNumber { get; init; }
+        public string TransactionType { get; init; } = "";
+        public string QuantityBucket { get; init; } = "";
+        public decimal QtyChange { get; init; }
+        public decimal? CostPerUnit { get; init; }
+        public string? SourceDocumentType { get; init; }
+        public long? SourceDocumentId { get; init; }
+        public long? SourceLineId { get; init; }
+        public long? ReversalOfTransactionId { get; init; }
+        public string? Reason { get; init; }
+        public string? CreatedBy { get; init; }
+        public DateTime CreatedUtc { get; init; }
+    }
+
+    private static InventoryTransactionDto ToTransactionDto(LedgerTransactionRow r) =>
+        new(
+            r.InventoryTransactionId,
+            r.ProductVariantId,
+            r.VariantDisplay,
+            r.Sku,
+            r.WarehouseId,
+            r.WarehouseName,
+            r.BatchId,
+            r.BatchNumber,
+            r.ProductSerialId,
+            r.SerialNumber,
+            r.TransactionType,
+            r.QuantityBucket,
+            r.QtyChange,
+            r.CostPerUnit,
+            r.SourceDocumentType,
+            r.SourceDocumentId,
+            r.SourceLineId,
+            r.ReversalOfTransactionId,
+            r.Reason,
+            r.CreatedBy,
+            r.CreatedUtc);
 
     private sealed record BalanceRow(long InventoryBalanceId, decimal OnHandQty, decimal ReservedQty, decimal DamagedQty, decimal IncomingQty, decimal InTransitQty);
 

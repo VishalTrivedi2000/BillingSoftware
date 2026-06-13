@@ -22,6 +22,7 @@ export function useDismissSuggestionLayer(
       if (!(target instanceof Element)) return;
       if (target.closest('[data-app-sidebar]')) return;
       if (target.closest('[data-app-header]')) return;
+      if (target.closest('[data-catalog-suggest]')) return;
       if (shell?.contains(target)) return;
       onDismiss();
     }

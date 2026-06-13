@@ -61,13 +61,20 @@ public sealed class InventoryController : ControllerBase
         [FromQuery] int take = 50,
         CancellationToken ct = default)
     {
-        var query = new InventoryLedgerQuery(
-            warehouseId, productVariantId, productId,
-            string.IsNullOrWhiteSpace(transactionType) ? null : transactionType.Trim().ToUpperInvariant(),
-            string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
-            fromUtc, toUtc, Math.Max(0, skip), Math.Clamp(take, 1, 500));
-        var dto = await _inventory.LedgerAsync(query, ct).ConfigureAwait(false);
-        return Ok(dto);
+        try
+        {
+            var query = new InventoryLedgerQuery(
+                warehouseId, productVariantId, productId,
+                string.IsNullOrWhiteSpace(transactionType) ? null : transactionType.Trim().ToUpperInvariant(),
+                string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
+                fromUtc, toUtc, Math.Max(0, skip), Math.Clamp(take, 1, 500));
+            var dto = await _inventory.LedgerAsync(query, ct).ConfigureAwait(false);
+            return Ok(dto);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpGet("ledger/{inventoryTransactionId:long}")]

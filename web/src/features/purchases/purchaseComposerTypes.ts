@@ -1,6 +1,8 @@
 export type DraftLine = {
   key: string;
   productId: number | null;
+  /** Selected variant for costing/display; optional on purchase API lines today. */
+  productVariantId: number | null;
   description: string;
   quantity: number;
   unitCost: number;

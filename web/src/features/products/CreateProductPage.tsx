@@ -5,14 +5,11 @@ import axios from 'axios';
 import {
   Barcode,
   ChevronDown,
-  CircleDollarSign,
   GitBranch,
   ImagePlus,
-  Layers,
   ExternalLink,
   Loader2,
   Package,
-  SlidersHorizontal,
   Star,
   Hash,
   Tag,
@@ -29,7 +26,7 @@ import type { InventoryTrackingMode, ProductVariantDto, WarehouseDto } from '../
 import { InventoryTrackingModes } from '../../entities/inventory';
 import { useAppSelector } from '../../app/hooks';
 import { selectIsAuthenticated, selectWorkplaceSnapshot } from '../auth/authSlice';
-import { apiJsonAuth } from '../../shared/api/axiosClient';
+import { apiJsonAuth, authApi } from '../../shared/api/axiosClient';
 import { inventoryApi } from '../inventory/inventoryApi';
 import { productApi } from './productApi';
 import { fmtInr } from '../inventory/inventoryHelpers';
@@ -58,9 +55,112 @@ export type VariantDraft = {
   displayName: string;
   barcode: string;
   salePrice: string;
+  purchasePrice: string;
+  attributeLabel: string;
+  additionalFields: CustomFieldDraft[];
 };
 
+/** Auto SKU from product name; user can override in the SKU field. */
+export function generateSkuFromName(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  let base = words
+    .map((w) => w.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8))
+    .filter(Boolean)
+    .join('-')
+    .toUpperCase()
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 28);
+  if (!base) base = 'ITEM';
+  const suffix = String(Math.floor(1000 + Math.random() * 9000));
+  return `${base}-${suffix}`;
+}
+
+function emptyVariantDraft(parent: ProductFormState): VariantDraft {
+  return {
+    key: crypto.randomUUID(),
+    sku: '',
+    displayName: '',
+    barcode: '',
+    salePrice: parent.unitPrice,
+    purchasePrice: parent.purchasePrice,
+    attributeLabel: '',
+    additionalFields: [],
+  };
+}
+
 export type CustomFieldDraft = { key: string; value: string };
+
+function variantAttributesFromDraft(v: VariantDraft): { key: string; value: string }[] {
+  const attrs: { key: string; value: string }[] = [];
+  const label = v.attributeLabel.trim();
+  if (label) attrs.push({ key: 'Option', value: label });
+  for (const f of v.additionalFields) {
+    const key = f.key.trim();
+    if (!key) continue;
+    if (attrs.some((a) => a.key.toLowerCase() === key.toLowerCase())) continue;
+    attrs.push({ key, value: f.value.trim() });
+  }
+  return attrs;
+}
+
+function AdditionalFieldsEditor({
+  fields,
+  onChange,
+}: {
+  fields: CustomFieldDraft[];
+  onChange: (fields: CustomFieldDraft[]) => void;
+}) {
+  return (
+    <div className="mt-3 border-t border-slate-200 pt-3">
+      <p className="mb-2 text-xs font-semibold text-slate-600">Additional fields</p>
+      <p className="mb-2 text-[11px] text-slate-500">
+        Optional key/value pairs (e.g. Color, Storage, Warranty note) stored on the variant.
+      </p>
+      <div className="space-y-2">
+        {fields.map((row, idx) => (
+          <div key={idx} className="flex gap-2">
+            <TextInput
+              placeholder="Field name"
+              value={row.key}
+              onChange={(e) => {
+                const next = [...fields];
+                next[idx] = { ...row, key: e.target.value };
+                onChange(next);
+              }}
+              className="flex-1"
+            />
+            <TextInput
+              placeholder="Value"
+              value={row.value}
+              onChange={(e) => {
+                const next = [...fields];
+                next[idx] = { ...row, value: e.target.value };
+                onChange(next);
+              }}
+              className="flex-1"
+            />
+            <button
+              type="button"
+              className="shrink-0 rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-white"
+              onClick={() => onChange(fields.filter((_, i) => i !== idx))}
+              aria-label="Remove field"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="text-sm font-semibold text-blue-600 hover:underline"
+          onClick={() => onChange([...fields, { key: '', value: '' }])}
+        >
+          + Add field
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export type SerialDraft = {
   key: string;
@@ -113,7 +213,6 @@ export type ProductFormState = {
   maxStock: string;
   lowStockAlert: boolean;
   variantDrafts: VariantDraft[];
-  customFields: CustomFieldDraft[];
   captureImeiSerial: boolean;
   serialDrafts: SerialDraft[];
 };
@@ -316,7 +415,6 @@ function defaultForm(): ProductFormState {
     maxStock: '',
     lowStockAlert: true,
     variantDrafts: [],
-    customFields: [{ key: '', value: '' }],
     captureImeiSerial: false,
     serialDrafts: [],
   };
@@ -499,15 +597,12 @@ function parseOptInt(raw: string): number | null | undefined {
 
 const TABS = [
   { id: 'basic' as const, label: 'Basic Information', icon: Package },
-  { id: 'category' as const, label: 'Category & Brand', icon: Layers },
-  { id: 'pricing' as const, label: 'Pricing & Tax', icon: CircleDollarSign },
   { id: 'variants' as const, label: 'Variants', icon: GitBranch },
   { id: 'inventory' as const, label: 'Inventory Rules', icon: Warehouse },
-  { id: 'custom' as const, label: 'Custom Fields', icon: SlidersHorizontal },
   { id: 'images' as const, label: 'Images & Documents', icon: ImagePlus },
 ];
 
-type LocationNotice = { notice?: string };
+type LocationNotice = { notice?: string; openTab?: ProductTabId };
 
 export function CreateProductPage() {
   const { productId: productIdParam } = useParams();
@@ -522,6 +617,8 @@ export function CreateProductPage() {
 
   const [tab, setTab] = useState<ProductTabId>('basic');
   const [form, setForm] = useState<ProductFormState>(defaultForm);
+  const [variantsProductId, setVariantsProductId] = useState<number | ''>('');
+  const skuUserEditedRef = useRef(false);
   const [tagInput, setTagInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [photoWarning, setPhotoWarning] = useState<string | null>(
@@ -560,10 +657,49 @@ export function CreateProductPage() {
     enabled: enabled && isEdit,
   });
 
+  const productsPickQ = useQuery({
+    queryKey: ['products-pick-variants', orgId],
+    queryFn: async () => {
+      const { data } = await authApi.get<ProductDto[]>('/v1/products?activeOnly=false&max=500');
+      return data;
+    },
+    enabled,
+  });
+
+  /** Ensures the open product always appears in the Variants dropdown (fixes stale list after create). */
+  const variantProductOptions = useMemo(() => {
+    const byId = new Map<number, ProductDto>();
+    for (const p of productsPickQ.data ?? []) byId.set(p.productId, p);
+    if (productQ.data) byId.set(productQ.data.productId, productQ.data);
+    if (isEdit && editId && !byId.has(editId)) {
+      if (productQ.data) byId.set(editId, productQ.data);
+      else if (form.name.trim()) {
+        byId.set(editId, {
+          productId: editId,
+          name: form.name.trim(),
+          sku: form.sku.trim() || null,
+          unitPrice: Number(form.unitPrice) || 0,
+          isActive: form.status === 'Active',
+          createdUtc: new Date().toISOString(),
+        } as ProductDto);
+      }
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [productsPickQ.data, productQ.data, isEdit, editId, form.name, form.sku]);
+
+  useEffect(() => {
+    if (isEdit && editId) setVariantsProductId(editId);
+  }, [isEdit, editId]);
+
+  useEffect(() => {
+    const st = location.state as { openTab?: ProductTabId } | null;
+    if (st?.openTab) setTab(st.openTab);
+  }, [location.state]);
+
   const variantsQ = useQuery({
-    queryKey: ['product-variants', editId],
-    queryFn: () => productApi.listVariants(editId!),
-    enabled: enabled && isEdit,
+    queryKey: ['product-variants', variantsProductId],
+    queryFn: () => productApi.listVariants(variantsProductId as number),
+    enabled: enabled && variantsProductId !== '',
   });
 
   const imagesQ = useQuery({
@@ -577,6 +713,7 @@ export function CreateProductPage() {
   useEffect(() => {
     if (!productQ.data || formHydratedRef.current) return;
     setForm(productToForm(productQ.data));
+    skuUserEditedRef.current = Boolean(productQ.data.sku?.trim());
     formHydratedRef.current = true;
   }, [productQ.data]);
 
@@ -593,13 +730,13 @@ export function CreateProductPage() {
 
   const setupHints = useMemo(() => {
     const missing: { label: string; tab: ProductTabId }[] = [];
-    if (!form.categoryId) missing.push({ label: 'Category', tab: 'category' });
-    if (!form.brandId && !form.brandText.trim()) missing.push({ label: 'Brand', tab: 'category' });
+    if (!form.categoryId) missing.push({ label: 'Category', tab: 'basic' });
+    if (!form.brandId && !form.brandText.trim()) missing.push({ label: 'Brand', tab: 'basic' });
     if (!form.hsnCode.trim()) missing.push({ label: 'HSN / tax code', tab: 'basic' });
     if (!form.isTaxApplicable || !form.taxRatePercent.trim())
-      missing.push({ label: 'Tax %', tab: 'pricing' });
+      missing.push({ label: 'Tax %', tab: 'basic' });
     if (!form.unitPrice.trim() || Number(form.unitPrice) === 0)
-      missing.push({ label: 'Sale price', tab: 'pricing' });
+      missing.push({ label: 'Sale price', tab: 'basic' });
     if (form.trackInventory && savedVariants.length === 0 && form.variantDrafts.length === 0)
       missing.push({ label: 'Inventory variant', tab: 'variants' });
     if (form.captureImeiSerial && !form.serialDrafts.some((s) => s.serialNumber.trim()))
@@ -641,9 +778,9 @@ export function CreateProductPage() {
   });
 
   const ensureVariantMut = useMutation({
-    mutationFn: () => productApi.ensureDefaultVariant(editId!),
+    mutationFn: () => productApi.ensureDefaultVariant(variantsProductId as number),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['product-variants', editId] });
+      void qc.invalidateQueries({ queryKey: ['product-variants', variantsProductId] });
       setPhotoWarning('Default inventory variant created. You can add more variants below.');
     },
     onError: (e: unknown) => setError(e instanceof Error ? e.message : 'Could not create default variant.'),
@@ -670,32 +807,35 @@ export function CreateProductPage() {
     });
   }
 
-  async function createVariantsForProduct(productId: number) {
+  async function createVariantsForProduct(variantTargetId: number, savedProductId: number) {
     const mode = trackingMode(form);
-    const existingVariants = await productApi.listVariants(productId);
     const newRows = form.variantDrafts.filter((v) => v.sku.trim() || v.displayName.trim());
 
     if (newRows.length > 0) {
       for (const v of newRows) {
         await inventoryApi.variants.create({
-          productId,
+          productId: variantTargetId,
           sku: v.sku.trim() || form.sku.trim() || null,
           barcode: v.barcode.trim() || form.barcode.trim() || null,
           displayName: v.displayName.trim() || form.name.trim(),
           salePrice: Number(v.salePrice) || Number(form.unitPrice) || 0,
-          purchasePrice: parseOptNum(form.purchasePrice),
+          purchasePrice: parseOptNum(v.purchasePrice) ?? parseOptNum(form.purchasePrice),
           mrp: parseOptNum(form.mrp),
           inventoryTrackingMode: mode,
-          attributes: [],
+          attributes: variantAttributesFromDraft(v),
         });
       }
-      return;
     }
 
     if (form.productType === 'service' || !form.trackInventory) return;
-    if (existingVariants.length > 0) return;
 
-    await productApi.ensureDefaultVariant(productId);
+    const ensureOn = async (pid: number) => {
+      const existing = await productApi.listVariants(pid);
+      if (existing.length === 0) await productApi.ensureDefaultVariant(pid);
+    };
+
+    await ensureOn(savedProductId);
+    if (variantTargetId !== savedProductId) await ensureOn(variantTargetId);
   }
 
   async function registerSerialsForProduct(productId: number) {
@@ -754,7 +894,9 @@ export function CreateProductPage() {
         productId = await productApi.create(body);
       }
 
-      await createVariantsForProduct(productId);
+      const variantTarget =
+        variantsProductId !== '' ? variantsProductId : productId;
+      await createVariantsForProduct(variantTarget, productId);
       await syncDefaultVariantBarcode(productId, form);
 
       const serialFail: string[] = [];
@@ -798,19 +940,30 @@ export function CreateProductPage() {
       patch({ variantDrafts: [], serialDrafts: [], captureImeiSerial: false });
       localStorage.removeItem(DRAFT_KEY);
       await qc.invalidateQueries({ queryKey: ['products-browse'] });
+      await qc.invalidateQueries({ queryKey: ['products-pick-variants'] });
+      await qc.invalidateQueries({ queryKey: ['products-pick'] });
       await qc.invalidateQueries({ queryKey: ['product-edit', r.productId] });
       await qc.invalidateQueries({ queryKey: ['product-variants', r.productId] });
+      if (variantsProductId !== '' && variantsProductId !== r.productId) {
+        await qc.invalidateQueries({ queryKey: ['product-variants', variantsProductId] });
+      }
       await qc.invalidateQueries({ queryKey: ['product-images', r.productId] });
       await qc.invalidateQueries({ queryKey: ['product-serials', r.productId] });
       if (r.created) {
+        setVariantsProductId(r.productId);
+        setTab('variants');
         navigate(`/products/${r.productId}/edit`, {
           replace: true,
           state: {
+            openTab: 'variants',
             notice:
-              'Product created with minimal details. Open each tab to add category, pricing, tax, variants, and images.',
+              'Product created. A default inventory variant was added — add more variants below.',
           },
         });
         return;
+      }
+      if (variantsProductId !== '') {
+        await qc.invalidateQueries({ queryKey: ['product-variants', variantsProductId] });
       }
       if (!r.stayOnPage) navigate('/products', { replace: true });
     },
@@ -833,7 +986,17 @@ export function CreateProductPage() {
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
-      setForm({ ...defaultForm(), ...JSON.parse(raw) });
+      const parsed = JSON.parse(raw) as Partial<ProductFormState> & {
+        customFields?: CustomFieldDraft[];
+      };
+      const base = { ...defaultForm(), ...parsed };
+      delete (base as { customFields?: CustomFieldDraft[] }).customFields;
+      base.variantDrafts = (base.variantDrafts ?? []).map((v) => ({
+        ...emptyVariantDraft(base),
+        ...v,
+        additionalFields: v.additionalFields ?? [],
+      }));
+      setForm(base);
       setPhotoWarning('Draft restored from this device.');
     } catch {
       setError('Could not load draft.');
@@ -1015,7 +1178,34 @@ export function CreateProductPage() {
                     <option value="service">Service (non-stock)</option>
                   </SelectInput>
                 </Field>
-                <Field label="Unit of Measure" required>
+                <Field label="Product Name" required className="sm:col-span-2">
+                  <TextInput
+                    value={form.name}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      if (!skuUserEditedRef.current) {
+                        patch({ name, sku: name.trim() ? generateSkuFromName(name) : '' });
+                      } else {
+                        patch({ name });
+                      }
+                    }}
+                    placeholder="Organic Basmati Rice 5kg"
+                  />
+                </Field>
+                <Field
+                  label="SKU"
+                  hint="Auto-generated from name — you can edit anytime."
+                >
+                  <TextInput
+                    value={form.sku}
+                    onChange={(e) => {
+                      skuUserEditedRef.current = true;
+                      patch({ sku: e.target.value });
+                    }}
+                    placeholder="Auto-generated on name entry"
+                  />
+                </Field>
+                <Field label="Unit of Measure">
                   <SelectInput
                     value={form.unitId === '' ? '' : String(form.unitId)}
                     onChange={(e) =>
@@ -1029,20 +1219,6 @@ export function CreateProductPage() {
                       </option>
                     ))}
                   </SelectInput>
-                </Field>
-                <Field label="Product Name" required className="sm:col-span-2">
-                  <TextInput
-                    value={form.name}
-                    onChange={(e) => patch({ name: e.target.value })}
-                    placeholder="Organic Basmati Rice 5kg"
-                  />
-                </Field>
-                <Field label="SKU" required>
-                  <TextInput
-                    value={form.sku}
-                    onChange={(e) => patch({ sku: e.target.value })}
-                    placeholder="RICE-ORG-5KG"
-                  />
                 </Field>
                 <Field label="Barcode (EAN / UPC)">
                   <div className="relative">
@@ -1058,7 +1234,7 @@ export function CreateProductPage() {
                     />
                   </div>
                 </Field>
-                <Field label="HSN / SAC Code" required>
+                <Field label="HSN / SAC Code">
                   <TextInput
                     value={form.hsnCode}
                     onChange={(e) => patch({ hsnCode: e.target.value })}
@@ -1134,7 +1310,7 @@ export function CreateProductPage() {
                       <option value="Inactive">Inactive</option>
                     </SelectInput>
                   </Field>
-                  <Field label="Visibility" required>
+                  <Field label="Visibility">
                     <SelectInput
                       value={form.visibility}
                       onChange={(e) => patch({ visibility: e.target.value })}
@@ -1232,6 +1408,113 @@ export function CreateProductPage() {
               </FormCard>
             </div>
 
+            <FormCard title="Category & Brand" className="lg:col-span-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="Category">
+                  <SelectInput
+                    value={form.categoryId === '' ? '' : String(form.categoryId)}
+                    onChange={(e) =>
+                      patch({ categoryId: e.target.value ? Number(e.target.value) : '' })
+                    }
+                  >
+                    <option value="">Uncategorized</option>
+                    {flatCategories.map((c) => (
+                      <option key={c.categoryId} value={c.categoryId}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </SelectInput>
+                </Field>
+                <Field label="Brand">
+                  <SelectInput
+                    value={form.brandId === '' ? '' : String(form.brandId)}
+                    onChange={(e) => {
+                      const id = e.target.value ? Number(e.target.value) : '';
+                      const b = brandOptions.find((x) => x.brandId === id);
+                      patch({ brandId: id, brandText: b?.name ?? form.brandText });
+                    }}
+                  >
+                    <option value="">Select brand…</option>
+                    {brandOptions.map((b) => (
+                      <option key={b.brandId} value={b.brandId}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </SelectInput>
+                </Field>
+                <Field label="Brand name (override)">
+                  <TextInput
+                    value={form.brandText}
+                    onChange={(e) => patch({ brandText: e.target.value })}
+                    placeholder="Green Earth"
+                  />
+                </Field>
+              </div>
+            </FormCard>
+
+            <FormCard title="Pricing & Tax" className="lg:col-span-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Field label="Sale Price (Unit Price)">
+                  <NumberInput
+                    value={form.unitPrice}
+                    onChange={(e) => patch({ unitPrice: e.target.value })}
+                    min={0}
+                    step="0.01"
+                  />
+                </Field>
+                <Field label="MRP">
+                  <NumberInput
+                    value={form.mrp}
+                    onChange={(e) => patch({ mrp: e.target.value })}
+                    min={0}
+                    step="0.01"
+                  />
+                </Field>
+                <Field label="Purchase Price">
+                  <NumberInput
+                    value={form.purchasePrice}
+                    onChange={(e) => patch({ purchasePrice: e.target.value })}
+                    min={0}
+                    step="0.01"
+                  />
+                </Field>
+                <Field label="Wholesale Price">
+                  <NumberInput
+                    value={form.wholesalePrice}
+                    onChange={(e) => patch({ wholesalePrice: e.target.value })}
+                    min={0}
+                    step="0.01"
+                  />
+                </Field>
+                <Field label="Min Wholesale Qty">
+                  <NumberInput
+                    value={form.minWholesaleQty}
+                    onChange={(e) => patch({ minWholesaleQty: e.target.value })}
+                    min={0}
+                  />
+                </Field>
+                <Field label="Tax applicable">
+                  <SelectInput
+                    value={form.isTaxApplicable ? 'yes' : 'no'}
+                    onChange={(e) => patch({ isTaxApplicable: e.target.value === 'yes' })}
+                  >
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </SelectInput>
+                </Field>
+                <Field label="Default GST / Tax %" hint="Used on invoices unless overridden.">
+                  <NumberInput
+                    value={form.taxRatePercent}
+                    onChange={(e) => patch({ taxRatePercent: e.target.value })}
+                    min={0}
+                    max={100}
+                    step="0.01"
+                    disabled={!form.isTaxApplicable}
+                  />
+                </Field>
+              </div>
+            </FormCard>
+
             <FormCard title="Additional Information" className="lg:col-span-3">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Field label="Manufacturer / Supplier">
@@ -1270,155 +1553,68 @@ export function CreateProductPage() {
                     <option value="no">No</option>
                   </SelectInput>
                 </Field>
-                <Field label="Is Tax Applicable">
-                  <SelectInput
-                    value={form.isTaxApplicable ? 'yes' : 'no'}
-                    onChange={(e) => patch({ isTaxApplicable: e.target.value === 'yes' })}
-                  >
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
-                  </SelectInput>
-                </Field>
               </div>
-            </FormCard>
-          </div>
-        )}
-
-        {tab === 'category' && (
-          <div className="grid max-w-3xl grid-cols-1 gap-4">
-            <FormCard title="Category & Brand">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Category">
-                  <SelectInput
-                    value={form.categoryId === '' ? '' : String(form.categoryId)}
-                    onChange={(e) =>
-                      patch({ categoryId: e.target.value ? Number(e.target.value) : '' })
-                    }
-                  >
-                    <option value="">Uncategorized</option>
-                    {flatCategories.map((c) => (
-                      <option key={c.categoryId} value={c.categoryId}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </SelectInput>
-                </Field>
-                <Field label="Brand">
-                  <SelectInput
-                    value={form.brandId === '' ? '' : String(form.brandId)}
-                    onChange={(e) => {
-                      const id = e.target.value ? Number(e.target.value) : '';
-                      const b = brandOptions.find((x) => x.brandId === id);
-                      patch({ brandId: id, brandText: b?.name ?? form.brandText });
-                    }}
-                  >
-                    <option value="">Select brand…</option>
-                    {brandOptions.map((b) => (
-                      <option key={b.brandId} value={b.brandId}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </SelectInput>
-                </Field>
-                <Field label="Brand name (override)" className="sm:col-span-2">
-                  <TextInput
-                    value={form.brandText}
-                    onChange={(e) => patch({ brandText: e.target.value })}
-                    placeholder="Green Earth"
-                  />
-                </Field>
-              </div>
-              <p className="mt-4 text-xs text-slate-500">
-                Manage taxonomy from{' '}
-                <Link to="/products" className="font-semibold text-blue-600 hover:underline">
-                  Products → Categories & brands
-                </Link>
-                .
-              </p>
-            </FormCard>
-          </div>
-        )}
-
-        {tab === 'pricing' && (
-          <div className="grid max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormCard title="Retail & Sale">
-              <div className="space-y-3">
-                <Field label="Sale Price (Unit Price)" required>
-                  <NumberInput
-                    value={form.unitPrice}
-                    onChange={(e) => patch({ unitPrice: e.target.value })}
-                    min={0}
-                    step="0.01"
-                  />
-                </Field>
-                <Field label="MRP">
-                  <NumberInput
-                    value={form.mrp}
-                    onChange={(e) => patch({ mrp: e.target.value })}
-                    min={0}
-                    step="0.01"
-                  />
-                </Field>
-              </div>
-            </FormCard>
-            <FormCard title="Cost & Wholesale">
-              <div className="space-y-3">
-                <Field label="Purchase Price">
-                  <NumberInput
-                    value={form.purchasePrice}
-                    onChange={(e) => patch({ purchasePrice: e.target.value })}
-                    min={0}
-                    step="0.01"
-                  />
-                </Field>
-                <Field label="Wholesale Price">
-                  <NumberInput
-                    value={form.wholesalePrice}
-                    onChange={(e) => patch({ wholesalePrice: e.target.value })}
-                    min={0}
-                    step="0.01"
-                  />
-                </Field>
-                <Field label="Min Wholesale Qty">
-                  <NumberInput
-                    value={form.minWholesaleQty}
-                    onChange={(e) => patch({ minWholesaleQty: e.target.value })}
-                    min={0}
-                  />
-                </Field>
-              </div>
-            </FormCard>
-            <FormCard title="Tax" className="sm:col-span-2">
-              <Field label="Default GST / Tax %" hint="Applied on invoices unless overridden per line.">
-                <NumberInput
-                  value={form.taxRatePercent}
-                  onChange={(e) => patch({ taxRatePercent: e.target.value })}
-                  min={0}
-                  max={100}
-                  step="0.01"
-                  disabled={!form.isTaxApplicable}
-                />
-              </Field>
             </FormCard>
           </div>
         )}
 
         {tab === 'variants' && (
-          <FormCard title="Product Variants" className="max-w-4xl">
+          <FormCard title="Product Variants">
             <InfoBanner>
-              Inventory variants are required for warehouse stock and invoices. If you only entered a
-              name when creating the product, click &quot;Create default variant&quot; or add rows below
-              — they are saved when you click Save Product.
+              Variants are managed on this tab. Select which product the new variants belong to, then add
+              rows below. They are saved when you click Save Product (save the product first if it is new).
             </InfoBanner>
 
-            {isEdit && (
-              <div className="mb-4">
+            {!isEdit && variantsProductId === '' ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Save the product on <strong>Basic Information</strong> first (click Save Product). You
+                will then return here with this product selected and a default variant ready.
+              </div>
+            ) : (
+              <Field
+                label="Product"
+                hint={
+                  isEdit
+                    ? 'This product is selected for viewing and adding variants.'
+                    : 'Choose which product receives the new variant rows below.'
+                }
+              >
+                <SelectInput
+                  value={variantsProductId === '' ? '' : String(variantsProductId)}
+                  onChange={(e) => {
+                    const id = e.target.value === '' ? '' : Number(e.target.value);
+                    setVariantsProductId(id);
+                  }}
+                >
+                  {!isEdit && <option value="">Select product…</option>}
+                  {variantProductOptions.map((p) => (
+                    <option key={p.productId} value={p.productId}>
+                      {p.sku ? `${p.sku} · ` : ''}
+                      {p.name}
+                      {isEdit && p.productId === editId ? ' (current)' : ''}
+                    </option>
+                  ))}
+                </SelectInput>
+                {productsPickQ.isLoading && (
+                  <p className="mt-1 text-xs text-slate-500">Loading product list…</p>
+                )}
+                {isEdit && productQ.data && (
+                  <p className="mt-2 text-xs text-slate-600">
+                    Editing <strong>{productQ.data.name}</strong>
+                    {productQ.data.sku ? ` · ${productQ.data.sku}` : ''}
+                  </p>
+                )}
+              </Field>
+            )}
+
+            {variantsProductId !== '' && (
+              <div className="mb-6 mt-4">
                 <div className="mb-2 flex items-center justify-between">
                   <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">
                     Saved variants ({savedVariants.length})
                   </h4>
                   <Link
-                    to={`/inventory/variants?productId=${editId}`}
+                    to={`/inventory/variants?productId=${variantsProductId}`}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
                   >
                     Open in Variants
@@ -1464,64 +1660,109 @@ export function CreateProductPage() {
               </div>
             )}
 
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
               Add new variants (saved on Submit)
             </h4>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {form.variantDrafts.map((v, idx) => (
                 <div
                   key={v.key}
-                  className="grid gap-3 rounded-xl border border-slate-100 bg-slate-50/80 p-3 sm:grid-cols-4"
+                  className="rounded-xl border border-slate-200 bg-slate-50/80 p-4"
                 >
-                  <TextInput
-                    placeholder="Variant SKU"
-                    value={v.sku}
-                    onChange={(e) => {
+                  <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <Field label="Variant name / option">
+                      <TextInput
+                        placeholder="e.g. Deep Purple, 256GB"
+                        value={v.displayName}
+                        onChange={(e) => {
+                          const displayName = e.target.value;
+                          const next = [...form.variantDrafts];
+                          const row = { ...v, displayName };
+                          if (!row.sku.trim() && displayName.trim()) {
+                            row.sku = generateSkuFromName(
+                              `${form.sku || form.name}-${displayName}`,
+                            );
+                          }
+                          next[idx] = row;
+                          patch({ variantDrafts: next });
+                        }}
+                      />
+                    </Field>
+                    <Field label="Variant SKU" hint="Auto-suggested from name — editable.">
+                      <TextInput
+                        value={v.sku}
+                        onChange={(e) => {
+                          const next = [...form.variantDrafts];
+                          next[idx] = { ...v, sku: e.target.value };
+                          patch({ variantDrafts: next });
+                        }}
+                      />
+                    </Field>
+                    <Field label="Attribute label (optional)">
+                      <TextInput
+                        placeholder="Color, Size, Storage…"
+                        value={v.attributeLabel}
+                        onChange={(e) => {
+                          const next = [...form.variantDrafts];
+                          next[idx] = { ...v, attributeLabel: e.target.value };
+                          patch({ variantDrafts: next });
+                        }}
+                      />
+                    </Field>
+                    <Field label="Barcode">
+                      <TextInput
+                        value={v.barcode}
+                        onChange={(e) => {
+                          const next = [...form.variantDrafts];
+                          next[idx] = { ...v, barcode: e.target.value };
+                          patch({ variantDrafts: next });
+                        }}
+                      />
+                    </Field>
+                    <Field label="Sale price">
+                      <NumberInput
+                        value={v.salePrice}
+                        onChange={(e) => {
+                          const next = [...form.variantDrafts];
+                          next[idx] = { ...v, salePrice: e.target.value };
+                          patch({ variantDrafts: next });
+                        }}
+                        min={0}
+                        step="0.01"
+                      />
+                    </Field>
+                    <Field label="Purchase price">
+                      <NumberInput
+                        value={v.purchasePrice}
+                        onChange={(e) => {
+                          const next = [...form.variantDrafts];
+                          next[idx] = { ...v, purchasePrice: e.target.value };
+                          patch({ variantDrafts: next });
+                        }}
+                        min={0}
+                        step="0.01"
+                      />
+                    </Field>
+                  </div>
+                  <AdditionalFieldsEditor
+                    fields={v.additionalFields}
+                    onChange={(additionalFields) => {
                       const next = [...form.variantDrafts];
-                      next[idx] = { ...v, sku: e.target.value };
+                      next[idx] = { ...v, additionalFields };
                       patch({ variantDrafts: next });
                     }}
                   />
-                  <TextInput
-                    placeholder="Display name"
-                    value={v.displayName}
-                    onChange={(e) => {
-                      const next = [...form.variantDrafts];
-                      next[idx] = { ...v, displayName: e.target.value };
-                      patch({ variantDrafts: next });
-                    }}
-                  />
-                  <TextInput
-                    placeholder="Barcode"
-                    value={v.barcode}
-                    onChange={(e) => {
-                      const next = [...form.variantDrafts];
-                      next[idx] = { ...v, barcode: e.target.value };
-                      patch({ variantDrafts: next });
-                    }}
-                  />
-                  <div className="flex gap-2">
-                    <NumberInput
-                      placeholder="Sale price"
-                      value={v.salePrice}
-                      onChange={(e) => {
-                        const next = [...form.variantDrafts];
-                        next[idx] = { ...v, salePrice: e.target.value };
-                        patch({ variantDrafts: next });
-                      }}
-                      min={0}
-                    />
+                  <div className="mt-3 flex justify-end">
                     <button
                       type="button"
-                      className="rounded-lg border border-slate-200 px-2 text-slate-500 hover:bg-white"
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
                       onClick={() =>
                         patch({
                           variantDrafts: form.variantDrafts.filter((_, i) => i !== idx),
                         })
                       }
-                      aria-label="Remove variant"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3.5 w-3.5" /> Remove variant
                     </button>
                   </div>
                 </div>
@@ -1530,21 +1771,12 @@ export function CreateProductPage() {
                 type="button"
                 onClick={() =>
                   patch({
-                    variantDrafts: [
-                      ...form.variantDrafts,
-                      {
-                        key: crypto.randomUUID(),
-                        sku: '',
-                        displayName: '',
-                        barcode: '',
-                        salePrice: form.unitPrice,
-                      },
-                    ],
+                    variantDrafts: [...form.variantDrafts, emptyVariantDraft(form)],
                   })
                 }
                 className="rounded-xl border border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50"
               >
-                + Add variant row
+                + Add variant
               </button>
             </div>
           </FormCard>
@@ -1659,48 +1891,6 @@ export function CreateProductPage() {
               </div>
             </FormCard>
           </div>
-        )}
-
-        {tab === 'custom' && (
-          <FormCard title="Custom Fields" className="max-w-3xl">
-            <InfoBanner>
-              Custom field definitions are stored per category in the universal inventory schema. Values
-              will sync when the custom-field API is exposed — capture keys here for your workflow.
-            </InfoBanner>
-            <div className="space-y-2">
-              {form.customFields.map((row, idx) => (
-                <div key={idx} className="grid grid-cols-2 gap-2">
-                  <TextInput
-                    placeholder="Field key"
-                    value={row.key}
-                    onChange={(e) => {
-                      const next = [...form.customFields];
-                      next[idx] = { ...row, key: e.target.value };
-                      patch({ customFields: next });
-                    }}
-                  />
-                  <TextInput
-                    placeholder="Value"
-                    value={row.value}
-                    onChange={(e) => {
-                      const next = [...form.customFields];
-                      next[idx] = { ...row, value: e.target.value };
-                      patch({ customFields: next });
-                    }}
-                  />
-                </div>
-              ))}
-              <button
-                type="button"
-                className="text-sm font-semibold text-blue-600 hover:underline"
-                onClick={() =>
-                  patch({ customFields: [...form.customFields, { key: '', value: '' }] })
-                }
-              >
-                + Add field
-              </button>
-            </div>
-          </FormCard>
         )}
 
         {tab === 'images' && (
@@ -1819,7 +2009,7 @@ export function CreateProductPage() {
               Restore local draft
             </button>
             {' · '}
-            Only product name is required — you can complete other tabs after save.
+            Only product name is required — SKU is auto-generated (editable). Use other tabs after save.
           </p>
         )}
       </form>

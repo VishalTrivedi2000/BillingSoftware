@@ -6,9 +6,11 @@ import './index.css';
 import App from './app/App';
 import { store } from './app/store';
 import { ThemeProvider } from './shared/theme/ThemeProvider';
-import { readStoredAppThemeId } from './shared/theme/appThemes';
+import { applyCatalogTheme, getCatalogTheme, readStoredCatalogThemeId } from './shared/theme/catalogTheme';
 
-document.documentElement.dataset.appTheme = readStoredAppThemeId();
+const bootThemeId = readStoredCatalogThemeId();
+const bootTheme = getCatalogTheme(bootThemeId);
+if (bootTheme) applyCatalogTheme(bootTheme, bootThemeId);
 
 const queryClient = new QueryClient();
 

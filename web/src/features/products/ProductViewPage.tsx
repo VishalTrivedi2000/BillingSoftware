@@ -195,10 +195,13 @@ export function ProductViewPage() {
     enabled: enabled && (tab === 'serials' || tab === 'warranty'),
   });
 
+  const needsLedger =
+    tab === 'purchases' || tab === 'sales' || tab === 'activity';
   const ledgerQ = useQuery({
     queryKey: ['product-ledger', productId],
     queryFn: () => inventoryApi.inventory.ledger({ productId, take: 200 }),
-    enabled,
+    enabled: enabled && needsLedger,
+    retry: 1,
   });
 
   const profitQ = useQuery({
@@ -556,12 +559,18 @@ export function ProductViewPage() {
             unitPrice={p.unitPrice}
           />
         )}
-        {tab === 'purchases' && <LedgerDocTab rows={purchaseTx} kind="purchase" />}
-        {tab === 'sales' && <LedgerDocTab rows={salesTx} kind="sale" />}
+        {tab === 'purchases' && (
+          <LedgerDocTab rows={purchaseTx} kind="purchase" ledgerError={ledgerQ.isError} />
+        )}
+        {tab === 'sales' && (
+          <LedgerDocTab rows={salesTx} kind="sale" ledgerError={ledgerQ.isError} />
+        )}
         {tab === 'warranty' && (
           <WarrantyTab serials={warrantySerials} loading={serialsQ.isLoading} />
         )}
-        {tab === 'activity' && <ActivityTab rows={ledger} loading={ledgerQ.isLoading} />}
+        {tab === 'activity' && (
+          <ActivityTab rows={ledger} loading={ledgerQ.isLoading} error={ledgerQ.isError} />
+        )}
       </div>
     </StockProPage>
   );
@@ -893,11 +902,20 @@ function SerialsTab({
 function LedgerDocTab({
   rows,
   kind,
+  ledgerError,
 }: {
   rows: InventoryTransactionDto[];
   kind: 'purchase' | 'sale';
+  ledgerError?: boolean;
 }) {
   const Icon = kind === 'purchase' ? Truck : ShoppingCart;
+  if (ledgerError) {
+    return (
+      <div className="p-5 text-sm text-amber-800">
+        Could not load inventory history. Restart the API after updating, then refresh this page.
+      </div>
+    );
+  }
   return (
     <div className="p-5">
       <p className="mb-4 flex items-center gap-2 text-sm text-slate-600">
@@ -1023,14 +1041,23 @@ function WarrantyTab({
 function ActivityTab({
   rows,
   loading,
+  error,
 }: {
   rows: InventoryTransactionDto[];
   loading: boolean;
+  error?: boolean;
 }) {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="p-5 text-sm text-amber-800">
+        Could not load inventory activity. Restart the API after updating, then open this tab again.
       </div>
     );
   }

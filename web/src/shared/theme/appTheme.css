@@ -1,339 +1,80 @@
-/* Workspace themes: driven by data-app-theme on <html> (see ThemeProvider + hydrate in main.tsx). RGB triplets pair with rgb(... / alpha). */
+/* Workspace themes: CSS variables set on <html> by catalogTheme.applyCatalogTheme (see ThemeProvider). */
 
-[data-app-theme='midnight'],
-[data-app-theme='charcoal'],
-[data-app-theme='ocean'],
-[data-app-theme='sunset'],
-[data-app-theme='violet'] {
-  --elevated-fg-rgb: 241 245 249;
-  --elevated-muted-rgb: 148 163 184;
-}
-
-[data-app-theme='midnight'] {
+:root {
   color-scheme: dark;
-  --shell-bg-rgb: 7 10 18;
-  --main-work-bg-rgb: 7 10 18;
-  --sidebar-bg-rgb: 10 15 26;
-  --header-bg-rgb: 7 10 18;
+  --shell-bg-rgb: 15 23 42;
+  --main-work-bg-rgb: 15 23 42;
+  --sidebar-bg-rgb: 15 23 42;
+  --header-bg-rgb: 15 23 42;
   --header-bg-alpha: 0.92;
   --border-subtle-rgb: 255 255 255;
   --border-subtle-alpha: 0.1;
-
-  --accent-rgb: 37 99 235;
-  --logo-from-rgb: 59 130 246;
-  --logo-to-rgb: 79 70 229;
-
-  --sidebar-title-rgb: 241 245 249;
-  --sidebar-tagline-rgb: 100 116 139;
-  --nav-section-rgb: 100 116 139;
+  --accent-rgb: 124 77 255;
+  --logo-from-rgb: 179 136 255;
+  --logo-to-rgb: 124 77 255;
+  --sidebar-title-rgb: 229 231 235;
+  --sidebar-tagline-rgb: 148 163 184;
+  --nav-section-rgb: 148 163 184;
   --nav-link-rgb: 148 163 184;
   --nav-link-hover-rgb: 241 245 249;
   --nav-hover-bg-rgb: 255 255 255;
   --nav-hover-bg-alpha: 0.05;
   --nav-active-fg-rgb: 255 255 255;
-  --nav-desc-muted-rgb: 71 85 105;
+  --nav-desc-muted-rgb: 100 116 139;
   --nav-desc-active-rgb: 219 234 254;
-
   --title-rgb: 255 255 255;
-  --crumb-rgb: 100 116 139;
-
+  --crumb-rgb: 148 163 184;
   --panel-bg-rgb: 18 22 31;
   --panel-bg-alpha: 0.95;
   --panel-border-rgb: 255 255 255;
   --panel-border-alpha: 0.1;
   --panel-shadow-opacity: 0.35;
-
   --panel-soft-bg-rgb: 255 255 255;
   --panel-soft-bg-alpha: 0.04;
   --panel-soft-border-rgb: 255 255 255;
   --panel-soft-border-alpha: 0.1;
-
   --elevated-bg-rgb: 15 20 31;
   --elevated-border-rgb: 255 255 255;
   --elevated-border-alpha: 0.12;
   --elevated-shadow-opacity: 0.5;
-
   --chip-border-rgb: 255 255 255;
   --chip-border-alpha: 0.1;
   --chip-bg-rgb: 255 255 255;
   --chip-bg-alpha: 0.05;
   --chip-fg-rgb: 148 163 184;
-
   --kbd-bg-rgb: 0 0 0;
   --kbd-bg-alpha: 0.4;
+  --elevated-fg-rgb: 241 245 249;
+  --elevated-muted-rgb: 148 163 184;
+  --theme-radius: 16px;
+  --theme-primary: #7c4dff;
+  --theme-secondary: #b388ff;
+
+  --content-fg-rgb: 229 231 235;
+  --content-muted-rgb: 148 163 184;
+  --content-subtle-rgb: 100 116 139;
+  --content-surface-rgb: 30 41 59;
+  --content-surface-2-rgb: 24 33 48;
+  --content-surface-hover-rgb: 38 50 68;
+  --content-border-rgb: 255 255 255;
+  --content-border-alpha: 0.12;
+  --content-input-bg-rgb: 15 23 42;
+  --content-input-fg-rgb: 229 231 235;
+  --content-input-border-rgb: 255 255 255;
+  --content-input-border-alpha: 0.14;
+  --content-input-disabled-bg-rgb: 20 28 42;
+  --content-placeholder-rgb: 100 116 139;
+  --content-table-head-rgb: 20 28 40;
+  --content-shadow-alpha: 0.15;
+  --btn-on-primary-rgb: 255 255 255;
+  --content-success-bg-rgb: 30 58 95;
+  --content-success-bg-alpha: 0.35;
+  --content-success-border-rgb: 59 130 246;
+  --content-success-fg-rgb: 220 252 231;
 }
 
-[data-app-theme='charcoal'] {
-  color-scheme: dark;
-  --shell-bg-rgb: 9 9 11;
-  --main-work-bg-rgb: 9 9 11;
-  --sidebar-bg-rgb: 24 24 27;
-  --header-bg-rgb: 9 9 11;
-  --header-bg-alpha: 0.92;
-  --border-subtle-rgb: 255 255 255;
-  --border-subtle-alpha: 0.09;
-
-  --accent-rgb: 59 130 246;
-  --logo-from-rgb: 82 82 91;
-  --logo-to-rgb: 39 39 42;
-
-  --sidebar-title-rgb: 244 244 245;
-  --sidebar-tagline-rgb: 113 113 122;
-  --nav-section-rgb: 113 113 122;
-  --nav-link-rgb: 161 161 170;
-  --nav-link-hover-rgb: 244 244 245;
-  --nav-hover-bg-rgb: 255 255 255;
-  --nav-hover-bg-alpha: 0.06;
-  --nav-active-fg-rgb: 255 255 255;
-  --nav-desc-muted-rgb: 82 82 91;
-  --nav-desc-active-rgb: 224 231 255;
-
-  --title-rgb: 250 250 250;
-  --crumb-rgb: 113 113 122;
-
-  --panel-bg-rgb: 24 24 27;
-  --panel-bg-alpha: 0.96;
-  --panel-border-rgb: 255 255 255;
-  --panel-border-alpha: 0.08;
-  --panel-shadow-opacity: 0.4;
-
-  --panel-soft-bg-rgb: 255 255 255;
-  --panel-soft-bg-alpha: 0.035;
-  --panel-soft-border-rgb: 255 255 255;
-  --panel-soft-border-alpha: 0.08;
-
-  --elevated-bg-rgb: 28 28 31;
-  --elevated-border-rgb: 255 255 255;
-  --elevated-border-alpha: 0.1;
-  --elevated-shadow-opacity: 0.55;
-
-  --chip-border-rgb: 255 255 255;
-  --chip-border-alpha: 0.09;
-  --chip-bg-rgb: 255 255 255;
-  --chip-bg-alpha: 0.05;
-  --chip-fg-rgb: 161 161 170;
-
-  --kbd-bg-rgb: 0 0 0;
-  --kbd-bg-alpha: 0.45;
-}
-
-[data-app-theme='ocean'] {
-  color-scheme: dark;
-  --shell-bg-rgb: 8 15 24;
-  --main-work-bg-rgb: 8 15 24;
-  --sidebar-bg-rgb: 10 22 36;
-  --header-bg-rgb: 8 15 24;
-  --header-bg-alpha: 0.92;
-  --border-subtle-rgb: 255 255 255;
-  --border-subtle-alpha: 0.09;
-
-  --accent-rgb: 13 148 136;
-  --logo-from-rgb: 34 211 238;
-  --logo-to-rgb: 20 184 166;
-
-  --sidebar-title-rgb: 236 254 255;
-  --sidebar-tagline-rgb: 94 156 156;
-  --nav-section-rgb: 94 156 156;
-  --nav-link-rgb: 153 203 205;
-  --nav-link-hover-rgb: 236 254 255;
-  --nav-hover-bg-rgb: 255 255 255;
-  --nav-hover-bg-alpha: 0.05;
-  --nav-active-fg-rgb: 255 255 255;
-  --nav-desc-muted-rgb: 71 105 110;
-  --nav-desc-active-rgb: 204 251 241;
-
-  --title-rgb: 240 253 250;
-  --crumb-rgb: 114 162 172;
-
-  --panel-bg-rgb: 15 28 42;
-  --panel-bg-alpha: 0.95;
-  --panel-border-rgb: 255 255 255;
-  --panel-border-alpha: 0.09;
-  --panel-shadow-opacity: 0.38;
-
-  --panel-soft-bg-rgb: 255 255 255;
-  --panel-soft-bg-alpha: 0.04;
-  --panel-soft-border-rgb: 255 255 255;
-  --panel-soft-border-alpha: 0.09;
-
-  --elevated-bg-rgb: 12 26 40;
-  --elevated-border-rgb: 255 255 255;
-  --elevated-border-alpha: 0.11;
-  --elevated-shadow-opacity: 0.48;
-
-  --chip-border-rgb: 255 255 255;
-  --chip-border-alpha: 0.09;
-  --chip-bg-rgb: 255 255 255;
-  --chip-bg-alpha: 0.05;
-  --chip-fg-rgb: 153 186 191;
-
-  --kbd-bg-rgb: 0 0 0;
-  --kbd-bg-alpha: 0.42;
-}
-
-[data-app-theme='sunset'] {
-  color-scheme: dark;
-  --shell-bg-rgb: 17 12 10;
-  --main-work-bg-rgb: 17 12 10;
-  --sidebar-bg-rgb: 28 18 14;
-  --header-bg-rgb: 17 12 10;
-  --header-bg-alpha: 0.92;
-  --border-subtle-rgb: 255 255 255;
-  --border-subtle-alpha: 0.09;
-
-  --accent-rgb: 234 88 12;
-  --logo-from-rgb: 251 146 60;
-  --logo-to-rgb: 234 88 12;
-
-  --sidebar-title-rgb: 255 247 237;
-  --sidebar-tagline-rgb: 168 132 119;
-  --nav-section-rgb: 168 132 119;
-  --nav-link-rgb: 203 170 159;
-  --nav-link-hover-rgb: 255 247 237;
-  --nav-hover-bg-rgb: 255 255 255;
-  --nav-hover-bg-alpha: 0.06;
-  --nav-active-fg-rgb: 255 255 255;
-  --nav-desc-muted-rgb: 120 90 82;
-  --nav-desc-active-rgb: 254 243 199;
-
-  --title-rgb: 255 250 245;
-  --crumb-rgb: 168 132 119;
-
-  --panel-bg-rgb: 32 22 18;
-  --panel-bg-alpha: 0.95;
-  --panel-border-rgb: 255 255 255;
-  --panel-border-alpha: 0.09;
-  --panel-shadow-opacity: 0.42;
-
-  --panel-soft-bg-rgb: 255 255 255;
-  --panel-soft-bg-alpha: 0.04;
-  --panel-soft-border-rgb: 255 255 255;
-  --panel-soft-border-alpha: 0.09;
-
-  --elevated-bg-rgb: 38 24 18;
-  --elevated-border-rgb: 255 255 255;
-  --elevated-border-alpha: 0.11;
-  --elevated-shadow-opacity: 0.52;
-
-  --chip-border-rgb: 255 255 255;
-  --chip-border-alpha: 0.09;
-  --chip-bg-rgb: 255 255 255;
-  --chip-bg-alpha: 0.05;
-  --chip-fg-rgb: 203 170 159;
-
-  --kbd-bg-rgb: 0 0 0;
-  --kbd-bg-alpha: 0.45;
-}
-
-[data-app-theme='violet'] {
-  color-scheme: dark;
-  --shell-bg-rgb: 11 9 18;
-  --main-work-bg-rgb: 11 9 18;
-  --sidebar-bg-rgb: 17 14 28;
-  --header-bg-rgb: 11 9 18;
-  --header-bg-alpha: 0.92;
-  --border-subtle-rgb: 255 255 255;
-  --border-subtle-alpha: 0.1;
-
-  --accent-rgb: 139 92 246;
-  --logo-from-rgb: 167 139 250;
-  --logo-to-rgb: 124 58 237;
-
-  --sidebar-title-rgb: 245 243 255;
-  --sidebar-tagline-rgb: 139 133 168;
-  --nav-section-rgb: 139 133 168;
-  --nav-link-rgb: 167 162 196;
-  --nav-link-hover-rgb: 245 243 255;
-  --nav-hover-bg-rgb: 255 255 255;
-  --nav-hover-bg-alpha: 0.05;
-  --nav-active-fg-rgb: 255 255 255;
-  --nav-desc-muted-rgb: 91 84 120;
-  --nav-desc-active-rgb: 237 233 254;
-
-  --title-rgb: 250 245 255;
-  --crumb-rgb: 139 133 168;
-
-  --panel-bg-rgb: 22 18 36;
-  --panel-bg-alpha: 0.95;
-  --panel-border-rgb: 255 255 255;
-  --panel-border-alpha: 0.1;
-  --panel-shadow-opacity: 0.4;
-
-  --panel-soft-bg-rgb: 255 255 255;
-  --panel-soft-bg-alpha: 0.04;
-  --panel-soft-border-rgb: 255 255 255;
-  --panel-soft-border-alpha: 0.1;
-
-  --elevated-bg-rgb: 19 15 33;
-  --elevated-border-rgb: 255 255 255;
-  --elevated-border-alpha: 0.12;
-  --elevated-shadow-opacity: 0.5;
-
-  --chip-border-rgb: 255 255 255;
-  --chip-border-alpha: 0.1;
-  --chip-bg-rgb: 255 255 255;
-  --chip-bg-alpha: 0.05;
-  --chip-fg-rgb: 167 162 196;
-
-  --kbd-bg-rgb: 0 0 0;
-  --kbd-bg-alpha: 0.42;
-}
-
-[data-app-theme='paper'] {
+[data-theme-mode='light'] {
   color-scheme: light;
-  --shell-bg-rgb: 241 245 249;
-  --main-work-bg-rgb: 18 22 31;
-  --sidebar-bg-rgb: 255 255 255;
-  --header-bg-rgb: 255 255 255;
-  --header-bg-alpha: 0.94;
-  --border-subtle-rgb: 226 232 240;
-  --border-subtle-alpha: 1;
-
-  --accent-rgb: 225 29 72;
-  --logo-from-rgb: 244 63 94;
-  --logo-to-rgb: 219 39 119;
-
-  --sidebar-title-rgb: 15 23 42;
-  --sidebar-tagline-rgb: 100 116 139;
-  --nav-section-rgb: 100 116 139;
-  --nav-link-rgb: 71 85 105;
-  --nav-link-hover-rgb: 15 23 42;
-  --nav-hover-bg-rgb: 241 245 249;
-  --nav-hover-bg-alpha: 1;
-  --nav-active-fg-rgb: 255 255 255;
-  --nav-desc-muted-rgb: 148 163 184;
-  --nav-desc-active-rgb: 255 255 255;
-
-  --title-rgb: 15 23 42;
-  --crumb-rgb: 100 116 139;
-
-  --panel-bg-rgb: 18 22 31;
-  --panel-bg-alpha: 0.98;
-  --panel-border-rgb: 255 255 255;
-  --panel-border-alpha: 0.08;
-  --panel-shadow-opacity: 0.18;
-
-  --panel-soft-bg-rgb: 248 250 252;
-  --panel-soft-bg-alpha: 1;
-  --panel-soft-border-rgb: 226 232 240;
-  --panel-soft-border-alpha: 1;
-
-  --elevated-bg-rgb: 255 255 255;
-  --elevated-border-rgb: 226 232 240;
-  --elevated-border-alpha: 1;
-  --elevated-shadow-opacity: 0.14;
-
-  --chip-border-rgb: 226 232 240;
-  --chip-border-alpha: 1;
-  --chip-bg-rgb: 248 250 252;
-  --chip-bg-alpha: 1;
-  --chip-fg-rgb: 71 85 105;
-
-  --kbd-bg-rgb: 241 245 249;
-  --kbd-bg-alpha: 1;
-
-  --elevated-fg-rgb: 15 23 42;
-  --elevated-muted-rgb: 100 116 139;
 }
 
 /* --- Structural utilities --- */
@@ -449,14 +190,22 @@
 }
 
 .workspace-panel {
-  border-radius: 1rem;
+  border-radius: var(--theme-radius, 1rem);
   border: 1px solid rgb(var(--panel-border-rgb) / var(--panel-border-alpha));
   background-color: rgb(var(--panel-bg-rgb) / var(--panel-bg-alpha));
   box-shadow: 0 25px 50px -12px rgb(0 0 0 / var(--panel-shadow-opacity));
 }
 
 .workspace-panel-soft {
-  border-radius: 0.75rem;
+  border-radius: calc(var(--theme-radius, 1rem) * 0.75);
   border: 1px solid rgb(var(--panel-soft-border-rgb) / var(--panel-soft-border-alpha));
   background-color: rgb(var(--panel-soft-bg-rgb) / var(--panel-soft-bg-alpha));
+}
+
+.theme-primary-bg {
+  background-color: var(--theme-primary);
+}
+
+.theme-primary-text {
+  color: var(--theme-primary);
 }

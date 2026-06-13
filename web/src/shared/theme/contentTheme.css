@@ -1,0 +1,246 @@
+/* Main workspace content — forms, cards, tables (inside .app-workspace-content). */
+
+.app-page-canvas {
+  background-color: rgb(var(--main-work-bg-rgb));
+  color: rgb(var(--content-fg-rgb));
+}
+
+.app-surface {
+  background-color: rgb(var(--content-surface-rgb));
+  border-color: rgb(var(--content-border-rgb) / var(--content-border-alpha));
+  color: rgb(var(--content-fg-rgb));
+  box-shadow: 0 1px 3px rgb(0 0 0 / var(--content-shadow-alpha, 0.08));
+  border-radius: var(--theme-radius, 1rem);
+}
+
+.app-field-label {
+  color: rgb(var(--content-muted-rgb));
+}
+
+.app-field {
+  background-color: rgb(var(--content-input-bg-rgb));
+  border-color: rgb(var(--content-input-border-rgb) / var(--content-input-border-alpha));
+  color: rgb(var(--content-input-fg-rgb));
+}
+
+.app-field::placeholder {
+  color: rgb(var(--content-placeholder-rgb));
+}
+
+.app-field:focus {
+  border-color: rgb(var(--accent-rgb));
+  box-shadow: 0 0 0 2px rgb(var(--accent-rgb) / 0.22);
+  outline: none;
+}
+
+.app-field:disabled {
+  background-color: rgb(var(--content-input-disabled-bg-rgb));
+  color: rgb(var(--content-placeholder-rgb));
+}
+
+.app-heading,
+.app-section-title {
+  color: rgb(var(--content-fg-rgb));
+}
+
+.app-text-muted {
+  color: rgb(var(--content-muted-rgb));
+}
+
+.app-text-subtle {
+  color: rgb(var(--content-subtle-rgb));
+}
+
+.app-btn-primary {
+  background-color: var(--theme-primary);
+  color: rgb(var(--btn-on-primary-rgb));
+}
+
+.app-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.app-btn-secondary {
+  background-color: rgb(var(--content-surface-rgb));
+  border-color: rgb(var(--content-border-rgb) / var(--content-border-alpha));
+  color: rgb(var(--content-fg-rgb));
+}
+
+.app-btn-secondary:hover:not(:disabled) {
+  background-color: rgb(var(--content-surface-hover-rgb));
+}
+
+.app-link {
+  color: rgb(var(--accent-rgb));
+}
+
+.app-link:hover {
+  filter: brightness(1.1);
+  text-decoration: underline;
+}
+
+.app-table {
+  border-color: rgb(var(--content-border-rgb) / var(--content-border-alpha));
+  background-color: rgb(var(--content-surface-rgb));
+}
+
+.app-table-head {
+  background-color: rgb(var(--content-table-head-rgb));
+  border-color: rgb(var(--content-border-rgb) / var(--content-border-alpha));
+  color: rgb(var(--content-muted-rgb));
+}
+
+.app-table tbody tr {
+  border-color: rgb(var(--content-border-rgb) / var(--content-border-alpha));
+}
+
+.app-table tbody tr:hover {
+  background-color: rgb(var(--content-surface-hover-rgb) / 0.65);
+}
+
+.app-alert-success {
+  background-color: rgb(var(--content-success-bg-rgb) / var(--content-success-bg-alpha));
+  border-color: rgb(var(--content-success-border-rgb) / 0.35);
+  color: rgb(var(--content-success-fg-rgb));
+}
+
+.app-tab-bar {
+  border-color: rgb(var(--content-border-rgb) / var(--content-border-alpha));
+}
+
+.app-tab-active {
+  border-color: rgb(var(--accent-rgb));
+  color: rgb(var(--accent-rgb));
+}
+
+.app-tab-inactive {
+  border-color: transparent;
+  color: rgb(var(--content-muted-rgb));
+}
+
+.app-tab-inactive:hover {
+  border-color: rgb(var(--content-border-rgb) / var(--content-border-alpha));
+  color: rgb(var(--content-fg-rgb));
+}
+
+/* workspace-panel pages: align text with theme in light mode */
+[data-theme-mode='light'] .app-workspace-content .workspace-panel {
+  color: rgb(var(--content-fg-rgb));
+}
+
+[data-theme-mode='light'] .app-workspace-content .workspace-panel .text-white {
+  color: rgb(var(--content-fg-rgb)) !important;
+}
+
+[data-theme-mode='light'] .app-workspace-content .workspace-panel .text-slate-100,
+[data-theme-mode='light'] .app-workspace-content .workspace-panel .text-slate-200,
+[data-theme-mode='light'] .app-workspace-content .workspace-panel .text-slate-300,
+[data-theme-mode='light'] .app-workspace-content .workspace-panel .text-slate-400 {
+  color: rgb(var(--content-muted-rgb)) !important;
+}
+
+/* Legacy Tailwind utility pages (invoice, product form, inventory dashboard) */
+.app-workspace-content .stockpro-product-form,
+.app-workspace-content .stockpro-inv-dashboard,
+.app-workspace-content .bg-\[\#f4f6fb\] {
+  background-color: rgb(var(--main-work-bg-rgb)) !important;
+  color: rgb(var(--content-fg-rgb));
+}
+
+.app-workspace-content .text-slate-900,
+.app-workspace-content .text-slate-800 {
+  color: rgb(var(--content-fg-rgb)) !important;
+}
+
+.app-workspace-content .text-slate-700 {
+  color: rgb(var(--content-fg-rgb) / 0.92) !important;
+}
+
+.app-workspace-content .text-slate-600,
+.app-workspace-content .text-slate-500 {
+  color: rgb(var(--content-muted-rgb)) !important;
+}
+
+.app-workspace-content .text-slate-400 {
+  color: rgb(var(--content-subtle-rgb)) !important;
+}
+
+.app-workspace-content .bg-white {
+  background-color: rgb(var(--content-surface-rgb)) !important;
+}
+
+.app-workspace-content .bg-slate-50,
+.app-workspace-content .bg-slate-50\/60 {
+  background-color: rgb(var(--content-surface-2-rgb) / 0.85) !important;
+}
+
+.app-workspace-content .border-slate-200,
+.app-workspace-content .border-slate-200\/90,
+.app-workspace-content .border-slate-100 {
+  border-color: rgb(var(--content-border-rgb) / var(--content-border-alpha)) !important;
+}
+
+.app-workspace-content input:not([type='checkbox']):not([type='radio']):not([type='range']),
+.app-workspace-content select,
+.app-workspace-content textarea {
+  background-color: rgb(var(--content-input-bg-rgb)) !important;
+  border-color: rgb(var(--content-input-border-rgb) / var(--content-input-border-alpha)) !important;
+  color: rgb(var(--content-input-fg-rgb)) !important;
+}
+
+.app-workspace-content input::placeholder,
+.app-workspace-content textarea::placeholder {
+  color: rgb(var(--content-placeholder-rgb)) !important;
+}
+
+.app-workspace-content input:focus,
+.app-workspace-content select:focus,
+.app-workspace-content textarea:focus {
+  border-color: rgb(var(--accent-rgb)) !important;
+  box-shadow: 0 0 0 2px rgb(var(--accent-rgb) / 0.2) !important;
+  outline: none !important;
+}
+
+.app-workspace-content .bg-blue-600,
+.app-workspace-content .bg-blue-500 {
+  background-color: var(--theme-primary) !important;
+}
+
+.app-workspace-content .text-blue-600,
+.app-workspace-content .text-blue-500,
+.app-workspace-content .border-blue-600 {
+  color: rgb(var(--accent-rgb)) !important;
+  border-color: rgb(var(--accent-rgb)) !important;
+}
+
+.app-workspace-content .hover\:bg-blue-500:hover {
+  filter: brightness(1.08);
+}
+
+.app-workspace-content .hover\:bg-slate-50:hover {
+  background-color: rgb(var(--content-surface-hover-rgb)) !important;
+}
+
+.app-workspace-content thead.bg-slate-50 {
+  background-color: rgb(var(--content-table-head-rgb)) !important;
+}
+
+/* Purchase composer dark cells → theme surfaces */
+.app-workspace-content .bg-\[\#1a1f2e\] {
+  background-color: rgb(var(--content-input-bg-rgb)) !important;
+  border-color: rgb(var(--content-input-border-rgb) / var(--content-input-border-alpha)) !important;
+  color: rgb(var(--content-input-fg-rgb)) !important;
+}
+
+.app-workspace-content .text-slate-100 {
+  color: rgb(var(--content-fg-rgb)) !important;
+}
+
+.app-workspace-content .border-white\/10 {
+  border-color: rgb(var(--content-border-rgb) / var(--content-border-alpha)) !important;
+}
+
+.app-workspace-content .hover\:bg-white\/5:hover,
+.app-workspace-content .hover\:bg-white\/10:hover {
+  background-color: rgb(var(--content-surface-hover-rgb) / 0.5) !important;
+}
