@@ -17,6 +17,12 @@ public static class PermissionNames
     public const string InvoicesRead = "invoices.read";
     public const string InvoicesUpdate = "invoices.update";
 
+    /// <summary>Record money collected against a posted invoice (settlement ledger).</summary>
+    public const string InvoicePaymentsRecord = "invoicePayments.record";
+
+    public const string PurchasesRead = "purchases.read";
+    public const string PurchasesCreate = "purchases.create";
+
     public const string CustomersRead = "customers.read";
     public const string CustomersCreate = "customers.create";
     public const string CustomersUpdate = "customers.update";
@@ -31,6 +37,24 @@ public static class PermissionNames
     public const string OrganizationsRead = "organizations.read";
     public const string OrganizationsManage = "organizations.manage";
 
+    public const string PartiesRead = "parties.read";
+    public const string PartiesManage = "parties.manage";
+
+    /* ---------- Universal Product & Inventory Management (UPIM) ---------- */
+    public const string WarehousesRead = "warehouses.read";
+    public const string WarehousesManage = "warehouses.manage";
+
+    public const string VariantsManage = "variants.manage";
+
+    public const string InventoryView = "inventory.view";
+    public const string InventoryAdjust = "inventory.adjust";
+    public const string InventoryTransfer = "inventory.transfer";
+    public const string InventoryReserve = "inventory.reserve";
+    public const string InventoryReturn = "inventory.return";
+
+    public const string ReportsInventory = "reports.inventory";
+    public const string ReportsProfitability = "reports.profitability";
+
     public static IReadOnlyList<string> All { get; } =
     [
         SystemHealth,
@@ -42,6 +66,9 @@ public static class PermissionNames
         InvoicesCreate,
         InvoicesRead,
         InvoicesUpdate,
+        InvoicePaymentsRecord,
+        PurchasesRead,
+        PurchasesCreate,
         CustomersRead,
         CustomersCreate,
         CustomersUpdate,
@@ -52,5 +79,17 @@ public static class PermissionNames
         TenantsManage,
         OrganizationsRead,
         OrganizationsManage,
+        PartiesRead,
+        PartiesManage,
+        WarehousesRead,
+        WarehousesManage,
+        VariantsManage,
+        InventoryView,
+        InventoryAdjust,
+        InventoryTransfer,
+        InventoryReserve,
+        InventoryReturn,
+        ReportsInventory,
+        ReportsProfitability,
     ];
 }

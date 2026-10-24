@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Activity, ArrowRight, RefreshCw } from 'lucide-react';
 import { apiJsonAuth } from '../../shared/api/axiosClient';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import { clearSession, selectWorkplaceSnapshot } from '../../features/auth/authSlice';
+import { clearSession, selectIsAuthenticated, selectWorkplaceSnapshot } from '../../features/auth/authSlice';
 import type { DashboardMetricsDto, InvoiceSummaryDto } from '../../entities/billing';
 
 async function fetchHealth(): Promise<{ status: string; sql: string }> {
@@ -118,31 +118,37 @@ function TrendMiniChart({ invoices }: { invoices: InvoiceSummaryDto[] }) {
 
 export function DashboardPage() {
   const dispatch = useAppDispatch();
+  const authed = useAppSelector(selectIsAuthenticated);
   const workplace = useAppSelector(selectWorkplaceSnapshot);
   const workplaceOrgId = workplace?.organizationId ?? 0;
+
+  const queryReady = authed && workplace != null;
 
   const healthQ = useQuery({
     queryKey: ['health', workplaceOrgId],
     queryFn: fetchHealth,
     retry: 1,
+    enabled: queryReady,
   });
 
   const metricsQ = useQuery({
     queryKey: ['dashboard-metrics', workplaceOrgId],
     queryFn: fetchMetrics,
     retry: 1,
+    enabled: queryReady,
   });
 
   const invoicesQ = useQuery({
     queryKey: ['invoices-recent', workplaceOrgId],
     queryFn: fetchRecentInvoices,
     retry: 1,
+    enabled: queryReady,
   });
 
   const trendRows = invoicesQ.data ?? [];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="mx-auto max-w-[1400px] space-y-6 pb-12">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-medium text-blue-400/90">Executive overview</p>

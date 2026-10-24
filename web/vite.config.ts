@@ -27,9 +27,14 @@ function devProxyFromBaseApi(env: Record<string, string>): Record<string, object
   }
 
   const prefix = raw.startsWith('/') ? raw.replace(/\/$/, '') || '/api' : '/api';
+  const target = 'http://localhost:5151';
   return {
     [prefix]: {
-      target: 'http://localhost:5151',
+      target,
+      changeOrigin: true,
+    },
+    '/uploads': {
+      target,
       changeOrigin: true,
     },
   };

@@ -3,10 +3,11 @@ import { flushSync } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, KeyRound, Loader2, Lock, Shield, Database, User } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import { selectIsAuthenticated, setSession } from '../../features/auth/authSlice';
-import { plainApi } from '../../shared/api/axiosClient';
+import { selectIsAuthenticated, clearSession, setSession } from '../../features/auth/authSlice';
+import { plainApi, apiJsonAuth } from '../../shared/api/axiosClient';
 import { apiUrl } from '../../shared/config';
 import { normalizeSessionPayload } from '../../shared/auth/normalizeSessionPayload';
+import type { AuthUserSummary } from '../../entities/auth-types';
 
 const seedRows = [
   { user: 'admin', password: 'Admin@123', note: 'Full access seed' },
@@ -83,6 +84,22 @@ export function LoginPage() {
       flushSync(() => {
         dispatch(setSession(normalized));
       });
+
+      try {
+        await apiJsonAuth<AuthUserSummary>('/v1/auth/me', {
+          headers: { Authorization: `Bearer ${normalized.accessToken}` },
+        });
+      } catch (err) {
+        dispatch(clearSession());
+        const msg =
+          err instanceof Error
+            ? err.message === 'Unauthorized — sign in again.'
+              ? 'Sign-in succeeded but GET /v1/auth/me returned 401 — the API rejected the access token (JWT signing key / issuer / audience must match this API, or you may be hitting a different API instance than login).'
+              : err.message
+            : 'The API rejected this session after login (check API URL / JWT).';
+        setError(msg);
+        return;
+      }
 
       if (remember) {
         try {

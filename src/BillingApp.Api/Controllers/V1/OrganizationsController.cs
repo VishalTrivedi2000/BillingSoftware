@@ -107,8 +107,8 @@ public sealed class OrganizationsController : ControllerBase
 
     private long? RequireUserId()
     {
-        var sub = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                  ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
         return long.TryParse(sub, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ? id : null;
     }
 }

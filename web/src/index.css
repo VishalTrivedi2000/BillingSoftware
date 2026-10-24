@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+@import './shared/theme/appTheme.css';
+@import './shared/theme/contentTheme.css';
 
 html {
   scroll-behavior: smooth;
@@ -10,19 +12,54 @@ html {
   }
 }
 
-/* Dark workspace panels (AppLayout shell) */
-@layer components {
-  .workspace-panel {
-    @apply rounded-2xl border border-white/10 bg-[#12161f]/95 shadow-xl shadow-black/30;
-  }
-  .workspace-panel-soft {
-    @apply rounded-xl border border-white/10 bg-white/[0.04];
-  }
-}
-
 .gradient-text {
   background: linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+    size: A4 portrait;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #0f172a !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  #root,
+  .min-h-screen {
+    min-height: auto !important;
+    background: #fff !important;
+  }
+
+  main.flex-1 {
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .invoice-print-root {
+    padding-bottom: 0 !important;
+    max-width: none !important;
+  }
+
+  .invoice-print-surface {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    border: none !important;
+    max-width: none !important;
+  }
+
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
 }

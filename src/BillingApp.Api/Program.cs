@@ -1,6 +1,7 @@
 using BillingApp.Api;
 using BillingApp.Infrastructure;
 using BillingApp.Infrastructure.Auth;
+using BillingApp.Infrastructure.Billing;
 using BillingApp.Infrastructure.Profiles;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
@@ -40,15 +41,18 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Data Source=AKASH\\SQLEXPRESS01;Initial Catalog=BSDB;Integrated Security=True;Trust Server Certificate=True";
+    ?? "Data Source=DESKTOP-4TKGMET;Initial Catalog=BSDB;Integrated Security=True;Trust Server Certificate=True";
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddBillingCore();
+builder.Services.AddInventoryModule();
 builder.Services.AddBillingProfiles(builder.Configuration);
+builder.Services.AddProductImages(builder.Configuration);
 
+var profileMaxBytes = builder.Configuration.GetValue<long?>("ProfileStorage:MaxPictureBytes") ?? 5 * 1024 * 1024;
+var productImgMaxBytes = builder.Configuration.GetValue<long?>("ProductImages:MaxPictureBytes") ?? profileMaxBytes;
 builder.Services.Configure<FormOptions>(options =>
 {
-    var max = builder.Configuration.GetValue<long?>("ProfileStorage:MaxPictureBytes") ?? 5 * 1024 * 1024;
-    options.MultipartBodyLengthLimit = max;
+    options.MultipartBodyLengthLimit = Math.Max(profileMaxBytes, productImgMaxBytes);
 });
 
 builder.Services.AddHttpContextAccessor();
@@ -76,22 +80,36 @@ builder.Services.AddSingleton(new AuthBootstrapOptions
         Path.Combine(migrationsDir, "005_users_developer_plaintext_password.sql"),
         Path.Combine(migrationsDir, "006_billing_core.sql"),
         Path.Combine(migrationsDir, "007_tenant_organization.sql"),
+        Path.Combine(migrationsDir, "008_parties.sql"),
+        Path.Combine(migrationsDir, "009_product_inventory_catalog.sql"),
+        Path.Combine(migrationsDir, "010_product_images.sql"),
+        Path.Combine(migrationsDir, "011_product_taxonomy.sql"),
+        Path.Combine(migrationsDir, "012_invoice_payments.sql"),
+        Path.Combine(migrationsDir, "013_purchase_bills.sql"),
+        Path.Combine(migrationsDir, "014_product_inventory_extended.sql"),
+        Path.Combine(migrationsDir, "015_purchase_line_tax_discount.sql"),
+        Path.Combine(migrationsDir, "016_universal_inventory_foundation.sql"),
+        Path.Combine(migrationsDir, "017_universal_inventory_backfill.sql"),
+        Path.Combine(migrationsDir, "018_universal_inventory_extras.sql"),
+        Path.Combine(migrationsDir, "019_fix_inventory_unique_index_scope.sql"),
+        Path.Combine(migrationsDir, "020_product_catalog_extended_fields.sql"),
     },
 });
 
 builder.Services.AddBillingAuth(builder.Configuration);
-builder.Services.AddBillingJwtAndAuthorizationPolicies(builder.Configuration);
+builder.Services.AddBillingJwtAndAuthorizationPolicies(builder.Configuration, builder.Environment);
 
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
+    app.UseDeveloperExceptionPage();
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
 app.UseCors("web");
+app.UseHttpsRedirection();
 
 var profileOpts = app.Configuration.GetSection(ProfileStorageOptions.SectionName).Get<ProfileStorageOptions>()
                   ?? new ProfileStorageOptions();
@@ -101,6 +119,16 @@ app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(profilePhysicalRoot),
     RequestPath = profileOpts.PublicRequestPath,
+});
+
+var productImgOpts = app.Configuration.GetSection(ProductImageStorageOptions.SectionName).Get<ProductImageStorageOptions>()
+                     ?? new ProductImageStorageOptions();
+var productPhysicalRoot = Path.Combine(app.Environment.ContentRootPath, productImgOpts.RelativeRoot.TrimStart('/', '\\'));
+Directory.CreateDirectory(productPhysicalRoot);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(productPhysicalRoot),
+    RequestPath = productImgOpts.PublicRequestPath,
 });
 
 app.UseAuthentication();

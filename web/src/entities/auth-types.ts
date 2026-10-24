@@ -12,6 +12,23 @@ export type TokenResponse = {
   organizationId: number;
 };
 
+export type ActiveRoleGrant = {
+  grantId: number;
+  roleId: number;
+  roleName: string;
+  startsUtc: string;
+  expiresUtc: string | null;
+};
+
+export type ActivePermissionGrant = {
+  grantId: number;
+  permission: string;
+  startsUtc: string;
+  expiresUtc: string | null;
+  /** ABAC-style scope string when the grant is narrowed (e.g. JSON resource predicate). */
+  resourceScope: string | null;
+};
+
 export type AuthUserSummary = {
   userId: number;
   username: string;
@@ -19,8 +36,8 @@ export type AuthUserSummary = {
   organizationId: number;
   roles: string[];
   permissions: string[];
-  activeRoleGrants: unknown[];
-  activePermissionGrants: unknown[];
+  activeRoleGrants: ActiveRoleGrant[];
+  activePermissionGrants: ActivePermissionGrant[];
 };
 
 export type OrganizationMembership = {

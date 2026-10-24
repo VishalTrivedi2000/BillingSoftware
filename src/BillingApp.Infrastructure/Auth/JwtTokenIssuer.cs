@@ -28,7 +28,7 @@ public sealed class JwtTokenIssuer : IJwtTokenIssuer
         };
 
         foreach (var r in user.Roles)
-            claims.Add(new Claim(ClaimTypes.Role, r));
+            claims.Add(new Claim("role", r));
 
         foreach (var p in user.Permissions.Distinct(StringComparer.Ordinal))
             claims.Add(new Claim(BillingClaims.Permission, p));

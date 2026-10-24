@@ -1,0 +1,211 @@
+/* Workspace themes: CSS variables set on <html> by catalogTheme.applyCatalogTheme (see ThemeProvider). */
+
+:root {
+  color-scheme: dark;
+  --shell-bg-rgb: 15 23 42;
+  --main-work-bg-rgb: 15 23 42;
+  --sidebar-bg-rgb: 15 23 42;
+  --header-bg-rgb: 15 23 42;
+  --header-bg-alpha: 0.92;
+  --border-subtle-rgb: 255 255 255;
+  --border-subtle-alpha: 0.1;
+  --accent-rgb: 124 77 255;
+  --logo-from-rgb: 179 136 255;
+  --logo-to-rgb: 124 77 255;
+  --sidebar-title-rgb: 229 231 235;
+  --sidebar-tagline-rgb: 148 163 184;
+  --nav-section-rgb: 148 163 184;
+  --nav-link-rgb: 148 163 184;
+  --nav-link-hover-rgb: 241 245 249;
+  --nav-hover-bg-rgb: 255 255 255;
+  --nav-hover-bg-alpha: 0.05;
+  --nav-active-fg-rgb: 255 255 255;
+  --nav-desc-muted-rgb: 100 116 139;
+  --nav-desc-active-rgb: 219 234 254;
+  --title-rgb: 255 255 255;
+  --crumb-rgb: 148 163 184;
+  --panel-bg-rgb: 18 22 31;
+  --panel-bg-alpha: 0.95;
+  --panel-border-rgb: 255 255 255;
+  --panel-border-alpha: 0.1;
+  --panel-shadow-opacity: 0.35;
+  --panel-soft-bg-rgb: 255 255 255;
+  --panel-soft-bg-alpha: 0.04;
+  --panel-soft-border-rgb: 255 255 255;
+  --panel-soft-border-alpha: 0.1;
+  --elevated-bg-rgb: 15 20 31;
+  --elevated-border-rgb: 255 255 255;
+  --elevated-border-alpha: 0.12;
+  --elevated-shadow-opacity: 0.5;
+  --chip-border-rgb: 255 255 255;
+  --chip-border-alpha: 0.1;
+  --chip-bg-rgb: 255 255 255;
+  --chip-bg-alpha: 0.05;
+  --chip-fg-rgb: 148 163 184;
+  --kbd-bg-rgb: 0 0 0;
+  --kbd-bg-alpha: 0.4;
+  --elevated-fg-rgb: 241 245 249;
+  --elevated-muted-rgb: 148 163 184;
+  --theme-radius: 16px;
+  --theme-primary: #7c4dff;
+  --theme-secondary: #b388ff;
+
+  --content-fg-rgb: 229 231 235;
+  --content-muted-rgb: 148 163 184;
+  --content-subtle-rgb: 100 116 139;
+  --content-surface-rgb: 30 41 59;
+  --content-surface-2-rgb: 24 33 48;
+  --content-surface-hover-rgb: 38 50 68;
+  --content-border-rgb: 255 255 255;
+  --content-border-alpha: 0.12;
+  --content-input-bg-rgb: 15 23 42;
+  --content-input-fg-rgb: 229 231 235;
+  --content-input-border-rgb: 255 255 255;
+  --content-input-border-alpha: 0.14;
+  --content-input-disabled-bg-rgb: 20 28 42;
+  --content-placeholder-rgb: 100 116 139;
+  --content-table-head-rgb: 20 28 40;
+  --content-shadow-alpha: 0.15;
+  --btn-on-primary-rgb: 255 255 255;
+  --content-success-bg-rgb: 30 58 95;
+  --content-success-bg-alpha: 0.35;
+  --content-success-border-rgb: 59 130 246;
+  --content-success-fg-rgb: 220 252 231;
+}
+
+[data-theme-mode='light'] {
+  color-scheme: light;
+}
+
+/* --- Structural utilities --- */
+.bg-app-shell {
+  background-color: rgb(var(--shell-bg-rgb));
+}
+
+.bg-app-main {
+  background-color: rgb(var(--main-work-bg-rgb));
+}
+
+.bg-app-sidebar {
+  background-color: rgb(var(--sidebar-bg-rgb));
+}
+
+.border-app-line {
+  border-color: rgb(var(--border-subtle-rgb) / var(--border-subtle-alpha));
+}
+
+.app-header-bar {
+  border-bottom: 1px solid rgb(var(--border-subtle-rgb) / var(--border-subtle-alpha));
+  background-color: rgb(var(--header-bg-rgb) / var(--header-bg-alpha));
+  backdrop-filter: blur(12px);
+}
+
+.text-app-page-title {
+  color: rgb(var(--title-rgb));
+}
+
+.text-app-crumb {
+  color: rgb(var(--crumb-rgb));
+}
+
+.text-app-sidebar-title {
+  color: rgb(var(--sidebar-title-rgb));
+}
+
+.text-app-sidebar-tagline {
+  color: rgb(var(--sidebar-tagline-rgb));
+}
+
+.text-app-nav-section {
+  color: rgb(var(--nav-section-rgb));
+}
+
+.text-app-nav-link {
+  color: rgb(var(--nav-link-rgb));
+}
+
+.text-app-nav-link-hover:hover {
+  color: rgb(var(--nav-link-hover-rgb));
+}
+
+.bg-app-nav-hover:hover {
+  background-color: rgb(var(--nav-hover-bg-rgb) / var(--nav-hover-bg-alpha));
+}
+
+.theme-nav-active {
+  background-color: rgb(var(--accent-rgb));
+  color: rgb(var(--nav-active-fg-rgb));
+}
+
+.theme-nav-active-shadow {
+  box-shadow:
+    0 10px 15px -3px rgb(var(--accent-rgb) / 0.28),
+    0 4px 6px -4px rgb(var(--accent-rgb) / 0.12);
+}
+
+.text-app-nav-desc {
+  color: rgb(var(--nav-desc-muted-rgb));
+}
+
+.text-app-nav-desc-active {
+  color: rgb(var(--nav-desc-active-rgb));
+}
+
+.theme-accent-link {
+  color: rgb(var(--accent-rgb));
+}
+
+.theme-accent-link:hover {
+  filter: brightness(1.12);
+}
+
+.theme-elevated-surface {
+  border: 1px solid rgb(var(--elevated-border-rgb) / var(--elevated-border-alpha));
+  background-color: rgb(var(--elevated-bg-rgb));
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / var(--elevated-shadow-opacity));
+}
+
+.theme-header-chip {
+  border: 1px solid rgb(var(--chip-border-rgb) / var(--chip-border-alpha));
+  background-color: rgb(var(--chip-bg-rgb) / var(--chip-bg-alpha));
+  color: rgb(var(--chip-fg-rgb));
+}
+
+.theme-kbd-chip {
+  border: 1px solid rgb(var(--border-subtle-rgb) / var(--border-subtle-alpha));
+  background-color: rgb(var(--kbd-bg-rgb) / var(--kbd-bg-alpha));
+}
+
+.text-elevated-primary {
+  color: rgb(var(--elevated-fg-rgb));
+}
+
+.text-elevated-muted {
+  color: rgb(var(--elevated-muted-rgb));
+}
+
+.placeholder-elevated::placeholder {
+  color: rgb(var(--elevated-muted-rgb));
+  opacity: 1;
+}
+
+.workspace-panel {
+  border-radius: var(--theme-radius, 1rem);
+  border: 1px solid rgb(var(--panel-border-rgb) / var(--panel-border-alpha));
+  background-color: rgb(var(--panel-bg-rgb) / var(--panel-bg-alpha));
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / var(--panel-shadow-opacity));
+}
+
+.workspace-panel-soft {
+  border-radius: calc(var(--theme-radius, 1rem) * 0.75);
+  border: 1px solid rgb(var(--panel-soft-border-rgb) / var(--panel-soft-border-alpha));
+  background-color: rgb(var(--panel-soft-bg-rgb) / var(--panel-soft-bg-alpha));
+}
+
+.theme-primary-bg {
+  background-color: var(--theme-primary);
+}
+
+.theme-primary-text {
+  color: var(--theme-primary);
+}

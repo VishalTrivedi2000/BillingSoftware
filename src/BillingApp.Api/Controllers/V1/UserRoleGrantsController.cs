@@ -70,8 +70,8 @@ public sealed class UserRoleGrantsController : ControllerBase
 
     private long? GetUserId()
     {
-        var sub = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                  ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        var sub = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                  ?? User.FindFirstValue(ClaimTypes.NameIdentifier);
         return long.TryParse(sub, out var id) ? id : null;
     }
 

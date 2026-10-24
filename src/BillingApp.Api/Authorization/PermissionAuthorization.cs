@@ -44,7 +44,23 @@ public static class PolicyNames
         public const string DelegationsManage = "perm:" + PermissionNames.DelegationsManage;
         public const string UsersManage = "perm:" + PermissionNames.UsersManage;
 
+        public const string RolesRead = "perm:" + PermissionNames.RolesRead;
+        public const string RolesManage = "perm:" + PermissionNames.RolesManage;
+
         /// <summary>Read product catalog: explicit <see cref="PermissionNames.ProductsRead"/> or invoice read/create (line-item workflow).</summary>
         public const string CatalogRead = "catalog:read";
+
+        /// <summary>Read inventory: any of <see cref="PermissionNames.InventoryView"/>, adjust, transfer, reserve, return, reports.inventory.</summary>
+        public const string InventoryRead = "inventory:read";
+
+        public const string WarehousesRead = "perm:" + PermissionNames.WarehousesRead;
+        public const string WarehousesManage = "perm:" + PermissionNames.WarehousesManage;
+        public const string VariantsManage = "perm:" + PermissionNames.VariantsManage;
+        public const string InventoryAdjust = "perm:" + PermissionNames.InventoryAdjust;
+        public const string InventoryTransfer = "perm:" + PermissionNames.InventoryTransfer;
+        public const string InventoryReserve = "perm:" + PermissionNames.InventoryReserve;
+        public const string InventoryReturn = "perm:" + PermissionNames.InventoryReturn;
+        public const string ReportsInventory = "perm:" + PermissionNames.ReportsInventory;
+        public const string ReportsProfitability = "perm:" + PermissionNames.ReportsProfitability;
     }
 }
