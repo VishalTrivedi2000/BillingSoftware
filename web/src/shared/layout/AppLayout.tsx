@@ -255,8 +255,8 @@ export function AppLayout() {
           {sidebarInner}
         </aside>
 
-        <div className="relative z-0 isolate flex min-w-0 flex-1 flex-col">
-          <header data-app-header className="app-header-bar no-print sticky top-0 z-30">
+        <div className="relative z-0 h-screen isolate flex min-w-0 flex-1 flex-col">
+          <header data-app-header className="app-header-bar    no-print sticky top-0 z-30">
             <div className="flex flex-wrap items-center gap-3 px-4 py-3 lg:px-6">
               <button
                 type="button"
@@ -340,7 +340,7 @@ export function AppLayout() {
           </header>
 
           <main
-            className={`bg-app-main flex min-h-0 flex-1 flex-col ${
+            className={` overflow-y-scroll bg-app-main flex min-h-0 flex-1 flex-col ${
               compactWorkspaceRail ? 'px-2 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6' : 'px-4 py-6 lg:px-8 lg:py-8'
             }`}
           >
