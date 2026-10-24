@@ -87,8 +87,7 @@ public sealed class InventoryController : ControllerBase
 
     [HttpPost("adjustments")]
     [Authorize(Policy = PolicyNames.BuiltIn.InventoryAdjust)]
-    public async Task<ActionResult<StockAdjustmentResultDto>> SubmitAdjustment(
-        [FromBody] SubmitStockAdjustmentRequest request, CancellationToken ct)
+    public async Task<ActionResult<StockAdjustmentResultDto>> SubmitAdjustment([FromBody] SubmitStockAdjustmentRequest request, CancellationToken ct)
     {
         try
         {
